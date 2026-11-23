@@ -69,11 +69,17 @@ def indice_zonas(filas):
     return {(f["departamento"], f["provincia"], f["distrito"], f["tipo"], f["operacion"], f.get("segmento") or "*"): f for f in filas}
 
 
-def buscar_zona(indice, inm, operacion, minimo, mismo_segmento=False):
+def factor_tamano(area, referencia=70):
+    return (max(area, 15) / referencia) ** -0.15 if area else 1.0
+
+
+def buscar_zona(indice, inm, operacion, minimo, mismo_segmento=False, hasta="provincia"):
     dep, prov, dist = norm(inm.get("departamento")), norm(inm.get("provincia")), norm(inm.get("distrito"))
     tipo = inm.get("tipo") or "*"
     segmentos = [segmento(inm)] if mismo_segmento else [segmento(inm), "*"]
-    for nivel, clave in [("distrito", (dep, prov, dist)), ("provincia", (dep, prov, "*")), ("departamento", (dep, "*", "*"))]:
+    niveles = [("distrito", (dep, prov, dist)), ("provincia", (dep, prov, "*")), ("departamento", (dep, "*", "*"))]
+    niveles = niveles[: [n for n, _ in niveles].index(hasta) + 1]
+    for nivel, clave in niveles:
         for seg in segmentos:
             z = indice.get((*clave, tipo, operacion, seg))
             if z and z["n"] >= minimo:
@@ -83,11 +89,13 @@ def buscar_zona(indice, inm, operacion, minimo, mismo_segmento=False):
 
 def estimar_renta(inm, indice, per_distrito, p):
     area = float(inm.get("area_m2") or 0)
+    if inm.get("tipo") == "terreno":
+        return 0.0, "terreno", 0
     z, nivel = buscar_zona(indice, inm, "alquiler", p["min_comparables"])
     if z and area:
-        return z["mediana_m2_usd"] * area * p["ajuste_renta"], f"comparables_{nivel}", z["n"]
+        return z["mediana_m2_usd"] * area * factor_tamano(area) * p["ajuste_renta"], f"comparables_{nivel}", z["n"]
     zv, _ = buscar_zona(indice, inm, "venta", p["min_comparables"])
-    base = zv["mediana_m2_usd"] * area if zv and area else float(inm["precio_usd"])
+    base = zv["mediana_m2_usd"] * area * factor_tamano(area) if zv and area else float(inm["precio_usd"])
     d = norm(inm.get("distrito"))
     per = next((v for k, v in per_distrito.items() if d and (k == d or k.startswith(d) or d.startswith(k))), None)
     if per and norm(inm.get("departamento")) in ("lima", "callao"):
@@ -126,7 +134,7 @@ def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None):
     zv, nivel_v = buscar_zona(indice, inm, "venta", p["min_comparables"])
     descuento = None
     if zv and area:
-        descuento = 1 - (precio / area) / zv["mediana_m2_usd"]
+        descuento = 1 - (precio / area) / (zv["mediana_m2_usd"] * factor_tamano(area))
     plusvalia = p["plusvalia_default"]
     if zv and zv.get("plusvalia_anual") is not None and zv["n"] >= 30:
         plusvalia = _limitar(float(zv["plusvalia_anual"]), -0.05, 0.12)
@@ -137,7 +145,7 @@ def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None):
     zseg, _ = buscar_zona(indice, inm, "venta", p["min_comparables"], mismo_segmento=True)
     mercado = 0.0
     if zseg and area:
-        mercado = zseg["mediana_m2_usd"] * area * (1 - p.get("descuento_negociacion", 0.07))
+        mercado = zseg["mediana_m2_usd"] * area * factor_tamano(area) * (1 - p.get("descuento_negociacion", 0.07))
         mercado = min(max(mercado, precio * 0.7), precio * 1.3)
     elif nuevo:
         mercado = precio * (1 - p.get("descuento_negociacion", 0.07))
@@ -215,8 +223,17 @@ def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None):
         confianza = "media"
 
     pmax = precio_maximo(s, p)
+    bruta = r["rentabilidad_bruta"] or 0
+    if bruta > 0.15:
+        riesgos.append(f"Alquiler estimado muy alto para el precio ({bruta:.0%} al año): probable dato mal leído")
+    desde = " desde " in f" {(inm.get('titulo') or '').lower()} " or "/proyecto" in (inm.get("url") or "")
+    if desde:
+        riesgos.append("Precio 'desde': corresponde a la unidad más barata del proyecto; confirma área y precio de la unidad que te interesa")
+    if inm.get("tipo") == "terreno":
+        riesgos.append("Terreno: se evalúa solo por precio frente a la zona y plusvalía, sin alquiler")
+    confiable = confianza != "baja" and (nivel_v or "").startswith("distrito") and bruta <= 0.12 and not inm.get("sospechoso")
     if total >= 7.5:
-        veredicto = "Comprar" if confianza != "baja" else "Revisar a mano"
+        veredicto = "Comprar" if confiable else "Revisar a mano"
     elif total >= 6 or pmax >= precio * 0.9:
         veredicto = "Negociar"
     else:

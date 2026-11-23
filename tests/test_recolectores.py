@@ -40,3 +40,14 @@ def test_json_ld():
 def test_rangos_y_textos():
     item = base.limpiar({"url": "u", "precio": "S/ 350,000", "moneda": "PEN", "dormitorios": "1 - 3", "area_m2": "70 m²"}, 3.45)
     assert item["dormitorios"] == 1 and item["area_m2"] == 70 and item["precio"] == 350000
+
+
+def test_proyecto_usa_unidad_mas_chica_y_tipo_de_url():
+    html = ('<div data-qa="posting PROPERTY" data-to-posting="/inmueble/proyecto/ememvein-proyecto-sol-cayma-1">'
+            '<div data-qa="POSTING_CARD_PRICE">Departamentos desde S/ 299,000</div><div data-qa="POSTING_CARD_LOCATION">Cayma, Arequipa</div>'
+            '<div data-qa="POSTING_CARD_FEATURES">45 un. 1 a 3 dorm. 41 a 133 m² tot.</div></div>'
+            '<div data-qa="posting PROPERTY" data-to-posting="/inmueble/clasificado/vecltein-venta-de-terreno-en-lurin-2">'
+            '<h3>Lindo departamento</h3><div data-qa="POSTING_CARD_PRICE">USD 90,000</div><div data-qa="POSTING_CARD_FEATURES">500 m² tot.</div></div>')
+    proyecto, terreno = navent.parsear(html, "https://urbania.pe/x")
+    assert proyecto["area_m2"] == 41 and proyecto["dormitorios"] == 1
+    assert terreno["tipo"] == "terreno" and terreno["area_m2"] == 500

@@ -20,10 +20,16 @@ SELECTORES = {
 def caracteristicas(texto):
     t = (texto or "").lower()
     salida = {}
-    m = re.search(r"([\d.,]+)\s*m²?\s*(cub|tech|const)", t) or re.search(r"([\d.,]+)\s*m²?\s*tot", t) or re.search(r"([\d.,]+)\s*m²", t)
+    rango = re.search(r"([\d.,]+)\s*a\s*([\d.,]+)\s*m²", t)
+    if rango:
+        salida["area_m2"] = numero(rango.group(1))
+    rango_d = re.search(r"(\d+)\s*a\s*\d+\s*(dorm|hab)", t)
+    if rango_d:
+        salida["dormitorios"] = int(rango_d.group(1))
+    m = None if rango else re.search(r"([\d.,]+)\s*m²?\s*(cub|tech|const)", t) or re.search(r"([\d.,]+)\s*m²?\s*tot", t) or re.search(r"([\d.,]+)\s*m²", t)
     if m:
         salida["area_m2"] = numero(m.group(1))
-    for campo, patron in [("dormitorios", r"(\d+)\s*(dorm|hab)"), ("banos", r"(\d+)\s*bañ"), ("estacionamientos", r"(\d+)\s*(estac|coch)")]:
+    for campo, patron in [("dormitorios", r"(?<!a )(\d+)\s*(dorm|hab)"), ("banos", r"(\d+)\s*bañ"), ("estacionamientos", r"(\d+)\s*(estac|coch)")]:
         m = re.search(patron, t)
         if m:
             salida[campo] = int(m.group(1))
@@ -60,7 +66,8 @@ def parsear(html, base_url, selectores=None):
         if direccion:
             item["direccion"] = direccion
         pista = f"{url} {item['titulo']} {desc}"
-        item["tipo"] = tipo_desde(pista)
+        slug = re.search(r"/(?:clasificado|proyecto)/[a-z]+-(?:proyecto-|venta-de-|alquiler-de-)?([a-z-]+?)-(?:en|lima|\d)", url)
+        item["tipo"] = tipo_desde(slug.group(1).replace("-", " ")) if slug and tipo_desde(slug.group(1).replace("-", " ")) else tipo_desde(pista)
         item["operacion"] = "alquiler" if re.search(r"/(clasificado|proyecto)/al|alquiler", url) else "venta" if re.search(r"/(clasificado|proyecto)/(ve|em)", url) else operacion_desde(pista)
         if item["operacion"] == "venta" and monto and moneda == "USD" and monto < 6000 and "venta" not in pista.lower():
             item["operacion"] = "alquiler"

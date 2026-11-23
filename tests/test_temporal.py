@@ -7,8 +7,8 @@ from tests.fake_db import FakeDB
 from tests.test_valoracion import mercado
 from inmo.valoracion import calcular_zonas, indice_zonas
 
-MERCADO = [{"departamento": "Lima", "provincia": "Lima", "distrito": "Barranco", "adr_usd": 70, "ocupacion": 0.55, "fuente": "a"},
-           {"departamento": "Lima", "provincia": "Lima", "distrito": "Barranco", "adr_usd": 80, "ocupacion": 0.65, "fuente": "b"},
+MERCADO = [{"departamento": "Lima", "provincia": "Lima", "distrito": "Barranco", "adr_usd": 95, "ocupacion": 0.55, "fuente": "a"},
+           {"departamento": "Lima", "provincia": "Lima", "distrito": "Barranco", "adr_usd": 105, "ocupacion": 0.65, "fuente": "b"},
            {"departamento": "Lima", "provincia": "Lima", "distrito": "Miraflores", "adr_usd": 75, "ocupacion": 0.6, "fuente": "a"}]
 
 
