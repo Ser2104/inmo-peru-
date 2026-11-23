@@ -26,3 +26,20 @@ def test_base_reintenta(monkeypatch):
         r.request = peticion
     llamadas = iter(respuestas)
     assert dbmod._con_reintentos(lambda *a, **k: next(llamadas)).json() == [{"a": 1}]
+
+
+def test_gemini_salta_modelos_retirados(monkeypatch):
+    monkeypatch.setattr(config, "GEMINI_MODEL", "gemini-2.5-flash")
+    usados = []
+
+    def post(url, **k):
+        modelo = url.split("/models/")[1].split(":")[0]
+        usados.append(modelo)
+        req = httpx.Request("POST", url)
+        if modelo == "gemini-2.5-flash":
+            return httpx.Response(404, request=req)
+        return httpx.Response(200, request=req, json={"candidates": [{"content": {"parts": [{"text": "pienso", "thought": True}, {"text": "[1]"}]}}]})
+
+    monkeypatch.setattr(llm.httpx, "post", post)
+    assert llm._gemini("x", False) == "[1]"
+    assert usados == ["gemini-2.5-flash", "gemini-flash-latest"]

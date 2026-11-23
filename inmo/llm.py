@@ -16,17 +16,24 @@ def _json(texto):
     return json.loads(texto[inicio:])
 
 
+MODELOS_GEMINI = ["gemini-flash-latest", "gemini-3-flash-preview", "gemini-3.1-flash-lite"]
+
+
 def _gemini(prompt, buscar):
     cuerpo = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
     if buscar:
         cuerpo["tools"] = [{"google_search": {}}]
     else:
         cuerpo["generationConfig"] = {"responseMimeType": "application/json"}
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{config.GEMINI_MODEL}:generateContent"
-    r = httpx.post(url, params={"key": config.GEMINI_API_KEY}, json=cuerpo, timeout=180)
-    r.raise_for_status()
-    partes = r.json()["candidates"][0]["content"]["parts"]
-    return "".join(p.get("text", "") for p in partes)
+    modelos = list(dict.fromkeys([m for m in [config.GEMINI_MODEL] if m] + MODELOS_GEMINI))
+    for modelo in modelos:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+        r = httpx.post(url, headers={"x-goog-api-key": config.GEMINI_API_KEY}, json=cuerpo, timeout=180)
+        if r.status_code == 404 and modelo != modelos[-1]:
+            continue
+        r.raise_for_status()
+        partes = r.json()["candidates"][0]["content"]["parts"]
+        return "".join(p.get("text", "") for p in partes if not p.get("thought"))
 
 
 def _anthropic(prompt, buscar):
