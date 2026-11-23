@@ -135,6 +135,9 @@ def ubicacion(texto):
 
 def limpiar(item, tc):
     item = {k: v for k, v in item.items() if v not in (None, "", [])}
+    for campo in ("area_m2", "precio", "precio_usd", "mantenimiento_usd", "mantenimiento"):
+        if item.get(campo) is not None and not isinstance(item[campo], (int, float)):
+            item[campo] = numero(item[campo])
     if item.get("precio") is not None and not item.get("precio_usd"):
         item["precio_usd"] = a_usd(item["precio"], item.get("moneda"), tc)
     if item.get("mantenimiento") is not None:
@@ -144,9 +147,6 @@ def limpiar(item, tc):
         if item.get(campo) is not None:
             m = re.search(r"\d+", str(item[campo]))
             item[campo] = int(m.group()) if m else None
-    for campo in ("area_m2", "precio", "precio_usd", "mantenimiento_usd"):
-        if item.get(campo) is not None and not isinstance(item[campo], (int, float)):
-            item[campo] = numero(item[campo])
     return item
 
 
