@@ -46,12 +46,19 @@ def recolectar(db, p, completo):
 def main():
     ap = argparse.ArgumentParser(description="Analizador inmobiliario Perú")
     ap.add_argument("tarea", choices=["ciclo", "completo", "bcrp", "buscar", "analizar", "auditar", "alertas", "mejorar",
-                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar"])
+                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar"])
+    ap.add_argument("--urls", nargs="*")
     ap.add_argument("--departamentos", nargs="*")
     a = ap.parse_args()
     db = DB()
     if a.tarea == "diagnostico":
         sys.exit(0 if mantenimiento.diagnostico(db)["ok"] else 1)
+    if a.tarea == "renormalizar":
+        print(mantenimiento.renormalizar(db))
+        return
+    if a.tarea == "probar":
+        mantenimiento.probar(a.urls or [])
+        return
     if a.tarea == "respaldo":
         print(mantenimiento.respaldo(db))
         return

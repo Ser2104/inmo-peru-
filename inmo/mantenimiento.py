@@ -74,3 +74,35 @@ def diagnostico(db):
     for icono, nombre, detalle in filas:
         print(icono, nombre, detalle)
     return {"ok": all(f[0] == "✅" for f in filas), "fallos": [f[1] for f in filas if f[0] == "❌"]}
+
+
+def renormalizar(db):
+    from . import ubigeo
+    cambios = 0
+    for i in db.select_all("inmuebles", select="id,url,titulo,descripcion,estado,departamento,provincia,distrito,direccion"):
+        lugar = ubigeo.resolver(i.get("distrito"), i.get("provincia"), i.get("departamento"))
+        nuevo = {}
+        if lugar.get("distrito") and (lugar["distrito"], lugar["departamento"]) != (i.get("distrito"), i.get("departamento")):
+            nuevo = {k: lugar[k] for k in ("departamento", "provincia", "distrito")}
+            if lugar.get("barrio") and not i.get("direccion"):
+                nuevo["direccion"] = lugar["barrio"]
+            nuevo["ubicacion_precision"] = None
+        texto = f"{i.get('url')} {i.get('titulo')} {i.get('descripcion')}".lower()
+        if i.get("estado") == "terminado" and ("/proyecto" in texto or " desde " in f" {texto}") and "entrega inmediata" not in texto:
+            nuevo["estado"] = "preventa"
+        if nuevo:
+            db.update("inmuebles", nuevo, id=f"eq.{i['id']}")
+            cambios += 1
+    return {"corregidos": cambios}
+
+
+def probar(urls):
+    from .collectors import base, navent, ia
+    for url in urls:
+        try:
+            html = base.descargar(url, intentos=1, pausa=(0, 0))
+        except RuntimeError as e:
+            print(url, "->", e)
+            continue
+        items = navent.parsear(html, url) or ia.extraer(html, url)
+        print(url, "->", len(items), "avisos;", [i.get("url") for i in items[:3]])

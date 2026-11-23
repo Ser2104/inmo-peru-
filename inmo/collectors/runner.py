@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from .. import config
 from . import base, navent, ia
+from .. import ubigeo
 
 COLUMNAS = [
     "fuente", "url", "titulo", "tipo", "operacion", "estado", "departamento", "provincia", "distrito", "direccion",
@@ -16,6 +17,16 @@ def normalizar(item, fuente_id, tc):
     item["tipo"] = item.get("tipo") or base.tipo_desde(pista)
     item["operacion"] = item.get("operacion") or base.operacion_desde(pista)
     item["estado"] = item.get("estado") if item.get("estado") in ("terminado", "en_planos", "preventa", "remate") else base.estado_desde(pista)
+    texto = pista.lower()
+    if item["estado"] == "terminado" and ("/proyecto" in texto or " desde " in f" {texto}") and "entrega inmediata" not in texto:
+        item["estado"] = "preventa"
+    lugar = ubigeo.resolver(item.get("distrito"), item.get("provincia"), item.get("departamento"))
+    if lugar.get("distrito"):
+        if lugar.get("barrio") and not item.get("direccion"):
+            item["direccion"] = lugar["barrio"]
+        item.update({k: lugar[k] for k in ("departamento", "provincia", "distrito")})
+    elif lugar.get("departamento"):
+        item["departamento"] = lugar["departamento"]
     item["fuente"] = fuente_id
     item["activo"] = True
     item["ultima_vez"] = datetime.now(timezone.utc).isoformat()
