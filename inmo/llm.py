@@ -34,7 +34,8 @@ def _gemini(prompt, buscar):
             r = httpx.post(url, headers={"x-goog-api-key": config.GEMINI_API_KEY}, json=cuerpo, timeout=180)
         if r.status_code in (404, 429, 500, 503) and modelo != modelos[-1]:
             continue
-        r.raise_for_status()
+        if r.status_code >= 400:
+            raise httpx.HTTPStatusError(f"{r.status_code} en {modelo}: {r.text[:300]}", request=r.request, response=r)
         partes = r.json()["candidates"][0]["content"]["parts"]
         return "".join(p.get("text", "") for p in partes if not p.get("thought"))
 
