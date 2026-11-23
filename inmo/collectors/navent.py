@@ -61,7 +61,7 @@ def parsear(html, base_url, selectores=None):
             item["direccion"] = direccion
         pista = f"{url} {item['titulo']} {desc}"
         item["tipo"] = tipo_desde(pista)
-        item["operacion"] = "alquiler" if re.search(r"/alcla|alquiler", url) else operacion_desde(pista)
+        item["operacion"] = "alquiler" if re.search(r"/(clasificado|proyecto)/al|alquiler", url) else "venta" if re.search(r"/(clasificado|proyecto)/(ve|em)", url) else operacion_desde(pista)
         if item["operacion"] == "venta" and monto and moneda == "USD" and monto < 6000 and "venta" not in pista.lower():
             item["operacion"] = "alquiler"
         item["estado"] = estado_desde(pista)

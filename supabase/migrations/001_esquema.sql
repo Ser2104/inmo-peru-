@@ -133,8 +133,8 @@ alter table ejecuciones enable row level security;
 
 insert into fuentes (id, nombre, tipo, urls) values
  ('bcrp','BCRP','bcrp','{}'),
- ('urbania','Urbania','navent','{"https://urbania.pe/inmuebles-ordenado-por-fechaonline-descendente-pagina-{n}.html"}'),
- ('adondevivir','Adondevivir','navent','{"https://www.adondevivir.com/inmuebles-ordenado-por-fechaonline-descendente-pagina-{n}.html"}'),
+ ('urbania','Urbania','navent','{"https://urbania.pe/buscar/venta-de-propiedades?page={n}","https://urbania.pe/buscar/alquiler-de-propiedades?page={n}","https://urbania.pe/buscar/proyectos-propiedades?page={n}"}'),
+ ('adondevivir','Adondevivir','navent','{"https://www.adondevivir.com/buscar/venta-de-propiedades?page={n}","https://www.adondevivir.com/buscar/alquiler-de-propiedades?page={n}"}'),
  ('properati','Properati','ia','{"https://www.properati.com.pe/s/venta?page={n}","https://www.properati.com.pe/s/alquiler?page={n}"}'),
  ('nexoinmobiliario','Nexo Inmobiliario','ia','{"https://nexoinmobiliario.pe/busqueda/venta-de-departamentos-en-peru?page={n}"}'),
  ('manual','Ingreso manual','manual','{}');
