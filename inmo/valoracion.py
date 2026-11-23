@@ -200,8 +200,8 @@ def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None):
         riesgos.append("Sin otros proyectos nuevos para comparar: el precio se compara con departamentos usados")
     if s.meses_hasta_renta:
         riesgos.append(f"Proyecto en planos: renta en ~{s.meses_hasta_renta} meses; revisar la constructora y la garantía bancaria")
-    if descuento is not None and descuento > 0.35:
-        riesgos.append("Precio muy por debajo de la zona: verificar papeles, cargas o estado del inmueble")
+    if descuento is not None and descuento > 0.30:
+        riesgos.append("Precio muy por debajo de la zona: puede ser una gran oportunidad o tener un problema (antigüedad, estado, papeles, cargas). Verifica antes")
     if inm.get("estado") == "remate":
         riesgos.append("Remate: revisar deudas, ocupantes y proceso judicial")
     if inm.get("sospechoso"):
@@ -233,7 +233,7 @@ def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None):
         riesgos.append("Terreno: se evalúa solo por precio frente a la zona y plusvalía, sin alquiler")
     confiable = confianza != "baja" and (nivel_v or "").startswith("distrito") and bruta <= 0.12 and not inm.get("sospechoso")
     if total >= 7.5:
-        veredicto = "Comprar" if confiable else "Revisar a mano"
+        veredicto = "Comprar" if confiable and (descuento or 0) <= 0.30 else "Revisar a mano"
     elif total >= 6 or pmax >= precio * 0.9:
         veredicto = "Negociar"
     else:

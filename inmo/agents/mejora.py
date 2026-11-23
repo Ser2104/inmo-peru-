@@ -59,8 +59,17 @@ def calibrar(db, p):
     params = [{"clave": "rentabilidad_por_departamento", "valor": rd}]
     if len(dias) >= 50:
         params.append({"clave": "vacancia", "valor": round(min(0.25, max(0.04, statistics.median(dias) / 365)), 4)})
+    per = p.get("per_distrito") or {}
+    ratios = []
+    filas = {(z["distrito"], z["operacion"]): z for z in db.select_all("zonas_stats", select="distrito,operacion,n,mediana_m2_usd", departamento="eq.lima", tipo="eq.departamento", segmento="eq.usado")}
+    for dist, valor_per in per.items():
+        v, a = filas.get((dist, "venta")), filas.get((dist, "alquiler"))
+        if v and a and v["n"] >= 20 and a["n"] >= 10 and valor_per:
+            ratios.append((1 / valor_per) / (a["mediana_m2_usd"] * 12 / v["mediana_m2_usd"]))
+    if len(ratios) >= 4:
+        params.append({"clave": "ajuste_renta", "valor": round(min(1.1, max(0.7, statistics.median(ratios))), 3)})
     db.upsert("parametros", params, on_conflict="clave")
-    return {"rentabilidad_por_departamento": rd, "datos_vacancia": len(dias)}
+    return {"rentabilidad_por_departamento": rd, "datos_vacancia": len(dias), "ajuste_renta": params[-1]["valor"] if len(ratios) >= 4 else None}
 
 
 def crear_issue(titulo, cuerpo, etiquetas=("mejora",)):
