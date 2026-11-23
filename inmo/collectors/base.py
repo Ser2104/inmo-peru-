@@ -142,7 +142,11 @@ def limpiar(item, tc):
     item.pop("moneda_mantenimiento", None)
     for campo in ("dormitorios", "banos", "estacionamientos"):
         if item.get(campo) is not None:
-            item[campo] = int(item[campo])
+            m = re.search(r"\d+", str(item[campo]))
+            item[campo] = int(m.group()) if m else None
+    for campo in ("area_m2", "precio", "precio_usd", "mantenimiento_usd"):
+        if item.get(campo) is not None and not isinstance(item[campo], (int, float)):
+            item[campo] = numero(item[campo])
     return item
 
 

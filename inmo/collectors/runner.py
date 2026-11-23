@@ -79,7 +79,13 @@ def recolectar_fuente(db, fuente, p, completo=False, reparar=None):
             except RuntimeError as e:
                 errores.append(str(e))
                 break
-            crudos = parsear(fuente, html, url)
+            try:
+                crudos = parsear(fuente, html, url)
+            except RuntimeError as e:
+                errores.append(f"{url}: {str(e)[:200]}")
+                if n == 1:
+                    break
+                continue
             if not crudos and n == 1 and reparar:
                 crudos = reparar(db, fuente, html, url)
             items = [i for i in (normalizar(c, fuente["id"], tc) for c in crudos) if base.valido(i)]

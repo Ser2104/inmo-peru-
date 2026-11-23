@@ -35,3 +35,8 @@ def test_json_ld():
     html = '<script type="application/ld+json">{"@type":"Residence","name":"Depa","url":"/a","offers":{"price":"120000","priceCurrency":"USD"},"floorSize":{"value":70}}</script>'
     items = json_ld(html, "https://x.pe/")
     assert items[0]["precio"] == 120000 and items[0]["url"] == "https://x.pe/a"
+
+
+def test_rangos_y_textos():
+    item = base.limpiar({"url": "u", "precio": "S/ 350,000", "moneda": "PEN", "dormitorios": "1 - 3", "area_m2": "70 m²"}, 3.45)
+    assert item["dormitorios"] == 1 and item["area_m2"] == 70 and item["precio"] == 350000

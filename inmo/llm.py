@@ -123,8 +123,8 @@ def _pedir(prompt, buscar, intentos):
                 return _json(llamar(prompt + "\n\nResponde solo con JSON válido.", buscar))
             except (httpx.HTTPError, json.JSONDecodeError, KeyError, IndexError, ValueError) as e:
                 errores.append(f"{nombre}: {e}")
-                cuota = isinstance(e, httpx.HTTPStatusError) and e.response.status_code in (401, 403)
-                if cuota:
+                codigo = e.response.status_code if isinstance(e, httpx.HTTPStatusError) else None
+                if codigo in (401, 403):
                     break
-                time.sleep(min(60, 5 * 2 ** n))
+                time.sleep(min(120, (30 if codigo == 503 else 5) * 2 ** n))
     raise RuntimeError("Ninguna IA respondió: " + " | ".join(errores[-4:]))
