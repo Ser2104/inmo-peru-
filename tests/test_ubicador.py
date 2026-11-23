@@ -32,5 +32,5 @@ def test_ejecutar(monkeypatch):
     db.upsert("inmuebles", {"url": "1", "activo": True, "lat": -12.1, "lng": -77.0})
     db.upsert("inmuebles", {"url": "2", "activo": True, "distrito": "Cayma", "provincia": "Arequipa", "departamento": "Arequipa"})
     monkeypatch.setattr(ubicador, "consultar", lambda t: LUGARES.get(ubicador.norm(t)))
-    assert ubicador.ejecutar(db)["ubicados"] == 2
+    assert ubicador.ejecutar(db)["ubicados_por_distrito"] == 2
     assert {i["ubicacion_precision"] for i in db.t["inmuebles"]} == {"exacta", "distrito"}

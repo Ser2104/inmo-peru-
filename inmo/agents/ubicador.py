@@ -67,29 +67,27 @@ class Ubicador:
         return None
 
 
-def ejecutar(db, limite_direcciones=600):
+def ejecutar(db, limite_direcciones=700):
     u = Ubicador(db)
     pendientes = db.select_all("inmuebles", select="id,direccion,distrito,provincia,departamento,lat,lng", activo="eq.true", ubicacion_precision="is.null")
-    ok = 0
+    rapidos = 0
     for inm in pendientes:
         if inm.get("lat") and inm.get("lng") and dentro_peru(inm["lat"], inm["lng"]):
             db.update("inmuebles", {"ubicacion_precision": "exacta"}, id=f"eq.{inm['id']}")
-            ok += 1
+            rapidos += 1
             continue
         r = u.ubicar({**inm, "direccion": None})
         if r:
             db.update("inmuebles", {"lat": r[0], "lng": r[1], "ubicacion_precision": r[2]}, id=f"eq.{inm['id']}")
-            ok += 1
+            rapidos += 1
     afinados = 0
-    candidatos = db.select("inmuebles", select="id,direccion,distrito,provincia,departamento", activo="eq.true", ubicacion_precision="eq.distrito", direccion="not.is.null", limit=str(limite_direcciones * 3))
-    for inm in candidatos:
+    por_afinar = db.select("inmuebles", select="id,direccion,distrito,provincia,departamento", activo="eq.true", ubicacion_precision="eq.distrito", direccion="not.is.null", limit=str(limite_direcciones * 2))
+    for inm in por_afinar:
         if u.nuevas >= limite_direcciones:
             break
         lugar = ", ".join(x for x in (inm.get("distrito"), inm.get("provincia"), inm.get("departamento")) if x)
-        if norm(f"{inm['direccion']}, {lugar}, Perú") in u.cache:
-            continue
-        r = u.ubicar(inm)
-        if r and r[2] == "direccion":
-            db.update("inmuebles", {"lat": r[0], "lng": r[1], "ubicacion_precision": "direccion"}, id=f"eq.{inm['id']}")
+        punto = u.buscar(f"{inm['direccion']}, {lugar}, Perú") if lugar else None
+        if punto:
+            db.update("inmuebles", {"lat": punto[0], "lng": punto[1], "ubicacion_precision": "direccion"}, id=f"eq.{inm['id']}")
             afinados += 1
-    return {"pendientes": len(pendientes), "ubicados": ok, "afinados_por_direccion": afinados, "consultas_nuevas": u.nuevas}
+    return {"ubicados_por_distrito": rapidos, "afinados_por_direccion": afinados, "consultas_nuevas": u.nuevas}

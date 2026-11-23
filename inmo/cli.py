@@ -67,39 +67,36 @@ def main():
         return
     p = db.parametros()
 
+    lento = a.tarea == "completo"
     if a.tarea in ("bcrp", "completo"):
         paso(db, "bcrp", lambda: bcrp.actualizar(db, date.today().year))
         p = db.parametros()
     if a.tarea in ("ciclo", "completo"):
-        recolectar(db, p, a.tarea == "completo")
-    if a.tarea in ("buscar", "completo"):
-        paso(db, "buscador", lambda: buscador.ejecutar(db, p, a.departamentos))
-    if a.tarea in ("temporal", "completo"):
-        paso(db, "temporal", lambda: temporal.ejecutar(db, p))
-    if a.tarea in ("explorar", "completo"):
-        paso(db, "explorador", lambda: explorador.ejecutar(db, p))
-    if a.tarea in ("completo", "rapido"):
-        paso(db, "auditor", lambda: auditor.ejecutar(db))
-        paso(db, "ubicador", lambda: ubicador.ejecutar(db))
-        paso(db, "analista", lambda: analista.ejecutar(db, p, todo=True))
-    if a.tarea in ("rastrear", "completo"):
-        paso(db, "rastreador", lambda: rastreador.ejecutar(db, p))
-    if a.tarea in ("ciclo", "verificar"):
-        paso(db, "verificador", lambda: explorador.verificar(db, p))
+        recolectar(db, p, lento)
     if a.tarea in ("ciclo", "completo", "auditar"):
         paso(db, "auditor", lambda: auditor.ejecutar(db))
-    if a.tarea in ("mejorar", "completo"):
-        paso(db, "mejora", lambda: mejora.ejecutar(db, p))
-        p = db.parametros()
     if a.tarea in ("ciclo", "completo", "ubicar"):
         paso(db, "ubicador", lambda: ubicador.ejecutar(db))
     if a.tarea in ("ciclo", "completo", "analizar"):
         paso(db, "analista", lambda: analista.ejecutar(db, p, todo=a.tarea != "ciclo"))
     if a.tarea in ("ciclo", "completo", "alertas"):
         paso(db, "alertas", lambda: alertas.ejecutar(db, p))
+    if a.tarea in ("temporal", "completo"):
+        paso(db, "temporal", lambda: temporal.ejecutar(db, p))
+    if a.tarea in ("buscar", "completo"):
+        paso(db, "buscador", lambda: buscador.ejecutar(db, p, a.departamentos))
+    if a.tarea in ("explorar", "completo"):
+        paso(db, "explorador", lambda: explorador.ejecutar(db, p))
+    if a.tarea in ("rastrear", "completo"):
+        paso(db, "rastreador", lambda: rastreador.ejecutar(db, p))
+    if a.tarea in ("ciclo", "verificar"):
+        paso(db, "verificador", lambda: explorador.verificar(db, p))
+    if a.tarea in ("mejorar", "completo"):
+        paso(db, "mejora", lambda: mejora.ejecutar(db, p))
+    if a.tarea == "completo":
+        paso(db, "analista", lambda: analista.ejecutar(db, db.parametros(), todo=True))
     if a.tarea in ("ciclo", "completo", "vigilar"):
         paso(db, "vigilante", lambda: vigilante.ejecutar(db, db.parametros()))
-
 
 if __name__ == "__main__":
     main()

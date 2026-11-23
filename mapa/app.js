@@ -196,7 +196,10 @@ async function cargar() {
     return;
   }
   $("cargando").hidden = !!(inmuebles.length || arbitrajes.length);
-  if (!inmuebles.length && !arbitrajes.length) $("cargando").textContent = "Aún no hay inmuebles analizados. Los agentes los irán agregando.";
+  if (!inmuebles.length && !arbitrajes.length) {
+    const { count } = DEMO ? { count: 0 } : await sb.from("inmuebles").select("id", { count: "exact", head: true });
+    $("cargando").textContent = count ? `Ya se reunieron ${count.toLocaleString("es-PE")} inmuebles; se están analizando y ubicando. Vuelve en unos minutos.` : "Aún no hay inmuebles. Los agentes los irán agregando.";
+  }
   opciones();
   dibujar();
   if (inmuebles.length) mapa.fitBounds(L.latLngBounds(inmuebles.map((i) => [i.lat, i.lng])), { maxZoom: 12, padding: [20, 20] });
