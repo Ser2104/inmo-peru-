@@ -29,7 +29,7 @@ def _gemini(prompt, buscar):
     for modelo in modelos:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
         r = httpx.post(url, headers={"x-goog-api-key": config.GEMINI_API_KEY}, json=cuerpo, timeout=180)
-        if r.status_code == 404 and modelo != modelos[-1]:
+        if r.status_code in (404, 429, 500, 503) and modelo != modelos[-1]:
             continue
         r.raise_for_status()
         partes = r.json()["candidates"][0]["content"]["parts"]
