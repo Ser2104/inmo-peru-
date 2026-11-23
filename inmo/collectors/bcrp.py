@@ -1,5 +1,3 @@
-import httpx
-
 API = "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/{codigos}/json/{inicio}/{fin}"
 
 PER_DISTRITO = {
@@ -13,9 +11,9 @@ TIPO_CAMBIO = "PD04638PD"
 
 
 def _serie(codigo, inicio, fin):
-    r = httpx.get(API.format(codigos=codigo, inicio=inicio, fin=fin), timeout=60, follow_redirects=True)
-    r.raise_for_status()
-    datos = r.json()
+    import json
+    from .base import descargar
+    datos = json.loads(descargar(API.format(codigos=codigo, inicio=inicio, fin=fin), pausa=(0.3, 0.8)))
     nombre = datos["config"]["series"][0]["name"]
     filas = []
     for periodo in datos.get("periods", []):

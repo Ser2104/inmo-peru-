@@ -14,6 +14,8 @@ def _con_reintentos(funcion, *args, intentos=5, **kwargs):
             if r.status_code < 500 and r.status_code != 429:
                 r.raise_for_status()
                 return r
+        except (httpx.UnsupportedProtocol, httpx.InvalidURL):
+            raise
         except (httpx.TransportError, httpx.TimeoutException):
             if n == intentos - 1:
                 raise

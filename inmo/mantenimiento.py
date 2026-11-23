@@ -2,9 +2,8 @@ import gzip
 import json
 from pathlib import Path
 
-import httpx
-
 from . import config, llm
+from .collectors import bcrp
 from .notificar import telegram
 
 TABLAS = ["fuentes", "inmuebles", "precios_historial", "series_macro", "zonas_stats", "analisis", "alertas", "parametros"]
@@ -35,6 +34,18 @@ def restaurar(db, carpeta="respaldo"):
     return conteo
 
 
+PORTALES = [("Urbania", "https://urbania.pe/"), ("Adondevivir", "https://www.adondevivir.com/"), ("Properati", "https://www.properati.com.pe/"),
+            ("Nexo", "https://nexoinmobiliario.pe/"), ("BBVA adjudicados", "https://www.bbva.pe/personas/productos/inversiones/irbsa.html")]
+
+
+def _abre(url):
+    from .collectors.base import descargar
+    try:
+        return bool(descargar(url, intentos=1, pausa=(0, 0)))
+    except RuntimeError:
+        return False
+
+
 def _exigir(condicion, mensaje):
     if not condicion:
         raise RuntimeError(mensaje)
@@ -55,8 +66,10 @@ def diagnostico(db):
     for t in TABLAS + ["ejecuciones"]:
         check(f"Tabla {t}", lambda t=t: db.select(t, select="*", limit="1") and None)
     check("Funciones de mantenimiento", lambda: f"{db.rpc('tamano_db') / 1e6:.1f} MB usados")
-    check("IA", lambda: llm.pedir_json('Devuelve {"ok": true}', intentos=1) and "responde")
-    check("BCRP", lambda: httpx.get("https://estadisticas.bcrp.gob.pe/estadisticas/series/api/PD04638PD/json", timeout=30).raise_for_status() and "responde")
+    check("IA", lambda: _exigir(llm.disponible(), "falta GEMINI_API_KEY o ANTHROPIC_API_KEY") or (llm.pedir_json('Devuelve {"ok": true}', intentos=1) and "responde"))
+    check("IA con búsqueda en internet", lambda: llm.pedir_json('Busca el tipo de cambio del dólar en Perú hoy y devuelve {"tc": número}', buscar=True, intentos=1) and "responde")
+    check("BCRP", lambda: f"{len(bcrp._serie(bcrp.TIPO_CAMBIO, '2026-01-01', '2026-12-31'))} datos de tipo de cambio")
+    check("Portales", lambda: ", ".join(f"{n}: {'ok' if _abre(u) else 'bloqueado'}" for n, u in PORTALES))
     check("Telegram", lambda: _exigir(telegram("Prueba del analizador inmobiliario ✅"), "no configurado") or "mensaje enviado")
     for icono, nombre, detalle in filas:
         print(icono, nombre, detalle)
