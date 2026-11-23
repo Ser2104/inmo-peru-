@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Mapa de oportunidades inmobiliarias · Perú</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+:root{--verde:#1a7f37;--ambar:#c78a00;--rojo:#c62828;--gris:#6b7280;--fondo:#fff;--texto:#111827;--borde:#e5e7eb;--suave:#f3f4f6;--azul:#2563eb}
+[hidden]{display:none!important}*{box-sizing:border-box}html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--texto)}
+#mapa{position:absolute;inset:0}
+.barra{position:absolute;top:10px;left:10px;right:10px;z-index:1000;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+.barra>*{pointer-events:auto}
+.btn{background:var(--fondo);border:1px solid var(--borde);border-radius:10px;padding:9px 13px;font-size:14px;cursor:pointer;box-shadow:0 2px 6px #0002;white-space:nowrap}
+.btn.activo{background:var(--texto);color:#fff}
+.chip{background:var(--fondo);border-radius:10px;padding:9px 13px;font-size:13px;box-shadow:0 2px 6px #0002}
+.panel{position:absolute;z-index:1001;background:var(--fondo);box-shadow:0 4px 20px #0003;overflow:auto;display:none}
+.panel.abierto{display:block}
+#filtros,#lista{top:58px;left:10px;width:320px;max-height:calc(100% - 70px);border-radius:14px;padding:14px}
+#detalle{top:0;right:0;width:420px;height:100%;padding:18px}
+@media(max-width:700px){#filtros,#lista{left:0;right:0;width:auto;top:auto;bottom:0;max-height:70%;border-radius:16px 16px 0 0}
+#detalle{top:auto;bottom:0;width:100%;height:78%;border-radius:16px 16px 0 0}}
+label{display:block;font-size:13px;color:var(--gris);margin:10px 0 4px}
+select,input[type=number],input[type=email],input[type=password]{width:100%;padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:14px}
+.fila{display:flex;gap:6px;flex-wrap:wrap}.fila .btn{box-shadow:none;padding:6px 10px;font-size:13px}
+.cerrar{float:right;border:none;background:none;font-size:22px;cursor:pointer;color:var(--gris)}
+h2{font-size:18px;margin:0 0 4px}h3{font-size:15px;margin:18px 0 6px}
+.sub{color:var(--gris);font-size:13px;margin:0 0 12px}
+.veredicto{display:inline-block;color:#fff;border-radius:8px;padding:5px 12px;font-weight:600;font-size:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.dato{background:var(--suave);border-radius:10px;padding:9px}.dato small{display:block;color:var(--gris);font-size:12px}.dato b{font-size:16px}
+.barra-p{height:8px;border-radius:4px;background:var(--suave);overflow:hidden;margin-top:4px}.barra-p i{display:block;height:100%}
+.plazos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;font-size:12px;color:var(--gris)}
+ul{padding-left:18px;margin:6px 0}li{font-size:13px;margin:4px 0}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;border-bottom:1px solid var(--borde);text-align:left}
+.aviso{background:#fff7e6;border-radius:8px;padding:8px;font-size:12px;margin-top:10px}
+.item{padding:9px;border-bottom:1px solid var(--borde);cursor:pointer;font-size:13px}.item:hover{background:var(--suave)}
+.punto{width:18px;height:18px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px #0006;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700}
+.leyenda{position:absolute;bottom:22px;left:10px;z-index:999;background:var(--fondo);border-radius:10px;padding:8px 10px;font-size:12px;box-shadow:0 2px 6px #0002;line-height:1.7}
+.leyenda span{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+@media(max-width:700px){.leyenda{font-size:11px;bottom:12px}.btn,.chip{padding:7px 10px;font-size:13px}}
+#login{position:fixed;inset:0;z-index:2000;background:#f8fafc;display:flex;align-items:center;justify-content:center;padding:16px}
+#login form{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:360px;box-shadow:0 4px 20px #0001}
+#login button{width:100%;margin-top:14px}
+#cargando{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999}
+</style>
+</head>
+<body>
+<div id="login" hidden>
+  <form id="form-login">
+    <h2>Mapa de oportunidades</h2>
+    <p class="sub">Entra con tu cuenta para ver los inmuebles analizados.</p>
+    <label>Correo</label><input type="email" id="correo" required>
+    <label>Contraseña</label><input type="password" id="clave" required minlength="8">
+    <button class="btn activo" type="submit">Entrar</button>
+    <button class="btn" type="button" id="crear">Crear cuenta</button>
+    <p class="sub" id="msg-login" style="margin-top:12px"></p>
+  </form>
+</div>
+
+<div id="mapa"></div>
+<div class="barra">
+  <button class="btn" id="b-filtros">⚙️ Filtros</button>
+  <button class="btn" id="b-lista">🏆 Mejores</button>
+  <button class="btn activo" id="b-inversion">Comprar</button>
+  <button class="btn" id="b-arbitraje">Alquilar y operar por días</button>
+  <button class="btn" id="b-zonas">🗺️ Zonas</button>
+  <span class="chip" id="contador">…</span>
+</div>
+<div class="leyenda" id="leyenda"></div>
+<div class="chip" id="cargando">Cargando inmuebles…</div>
+
+<div class="panel" id="filtros">
+  <button class="cerrar" data-cierra="filtros">×</button>
+  <h2>Filtros</h2>
+  <label>Departamento</label><select id="f-dep"><option value="">Todo el Perú</option></select>
+  <label>Distrito</label><select id="f-dist"><option value="">Todos</option></select>
+  <label>¿Qué plazo te importa?</label>
+  <div class="fila" id="f-horizonte">
+    <button class="btn activo" data-v="total">General</button><button class="btn" data-v="corto">Corto</button>
+    <button class="btn" data-v="mediano">Mediano</button><button class="btn" data-v="largo">Largo</button>
+  </div>
+  <label>Veredicto</label>
+  <div class="fila" id="f-veredicto">
+    <button class="btn activo" data-v="Comprar">Comprar</button><button class="btn activo" data-v="Negociar">Negociar</button>
+    <button class="btn activo" data-v="Revisar a mano">Revisar</button><button class="btn" data-v="Descartar">Descartar</button>
+  </div>
+  <label>Mejor forma de alquilar</label>
+  <select id="f-estrategia"><option value="">Cualquiera</option><option value="largo_plazo">Alquiler tradicional</option><option value="temporal">Por días (Airbnb)</option></select>
+  <label>Tipo</label>
+  <select id="f-tipo"><option value="">Todos</option><option>departamento</option><option>casa</option><option>local</option><option>oficina</option><option>terreno</option><option>edificio</option></select>
+  <label>Situación</label>
+  <select id="f-estado"><option value="">Todas</option><option value="terminado">Terminado</option><option value="preventa">Preventa</option><option value="en_planos">En planos</option><option value="remate">Remate</option></select>
+  <label>Precio máximo (US$)</label><input type="number" id="f-precio" placeholder="Sin límite" step="5000">
+  <label>Puntaje mínimo: <b id="v-puntaje">0</b></label><input type="range" id="f-puntaje" min="0" max="10" step="0.5" value="0" style="width:100%">
+</div>
+
+<div class="panel" id="lista"><button class="cerrar" data-cierra="lista">×</button><h2>Las mejores oportunidades</h2><p class="sub">Según los filtros y el plazo elegido</p><div id="items"></div></div>
+<div class="panel" id="detalle"><button class="cerrar" data-cierra="detalle">×</button><div id="contenido"></div></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

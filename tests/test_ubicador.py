@@ -1,0 +1,36 @@
+from inmo.agents import ubicador
+from tests.fake_db import FakeDB
+
+LUGARES = {"av. ejercito 123, yanahuara, arequipa, arequipa, peru": (-16.39, -71.54), "cayma, arequipa, arequipa, peru": (-16.37, -71.55)}
+
+
+def falso(llamadas):
+    def consultar(texto):
+        llamadas.append(texto)
+        return LUGARES.get(ubicador.norm(texto))
+    return consultar
+
+
+def test_direccion_distrito_y_cache():
+    db, llamadas = FakeDB(), []
+    u = ubicador.Ubicador(db, falso(llamadas))
+    assert u.ubicar({"id": "a", "direccion": "Av. Ejército 123", "distrito": "Yanahuara", "provincia": "Arequipa", "departamento": "Arequipa"})[2] == "direccion"
+    lat, lng, prec = u.ubicar({"id": "b", "distrito": "Cayma", "provincia": "Arequipa", "departamento": "Arequipa"})
+    assert prec == "distrito" and (lat, lng) != (-16.37, -71.55) and abs(lat + 16.37) < 0.01
+    u.ubicar({"id": "c", "distrito": "Cayma", "provincia": "Arequipa", "departamento": "Arequipa"})
+    assert llamadas.count("Cayma, Arequipa, Arequipa, Perú") == 1
+    assert ubicador.Ubicador(db, falso([])).cache
+
+
+def test_fuera_de_peru_se_rechaza():
+    assert not ubicador.dentro_peru(40.7, -74.0)
+    assert ubicador.dentro_peru(-12.1, -77.03)
+
+
+def test_ejecutar(monkeypatch):
+    db = FakeDB()
+    db.upsert("inmuebles", {"url": "1", "activo": True, "lat": -12.1, "lng": -77.0})
+    db.upsert("inmuebles", {"url": "2", "activo": True, "distrito": "Cayma", "provincia": "Arequipa", "departamento": "Arequipa"})
+    monkeypatch.setattr(ubicador, "consultar", lambda t: LUGARES.get(ubicador.norm(t)))
+    assert ubicador.ejecutar(db)["ubicados"] == 2
+    assert {i["ubicacion_precision"] for i in db.t["inmuebles"]} == {"exacta", "distrito"}

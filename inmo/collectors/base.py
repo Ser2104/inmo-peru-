@@ -1,0 +1,150 @@
+import random
+import re
+import time
+
+import httpx
+
+try:
+    from curl_cffi import requests as cffi
+except ImportError:
+    cffi = None
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36",
+    "Accept-Language": "es-PE,es;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+}
+
+
+def _texto_pdf(contenido):
+    from io import BytesIO
+    from pypdf import PdfReader
+    paginas = PdfReader(BytesIO(contenido)).pages
+    return "\n".join((p.extract_text() or "") for p in paginas[:80])
+
+
+def descargar(url, intentos=3, pausa=(1.5, 4.0)):
+    ultimo = None
+    for n in range(intentos):
+        try:
+            if cffi:
+                r = cffi.get(url, impersonate="chrome", headers={"Accept-Language": HEADERS["Accept-Language"]}, timeout=60)
+            else:
+                r = httpx.get(url, headers=HEADERS, timeout=60, follow_redirects=True)
+            if r.status_code == 200:
+                time.sleep(random.uniform(*pausa))
+                tipo = r.headers.get("content-type", "")
+                if "pdf" in tipo or url.lower().split("?")[0].endswith(".pdf"):
+                    return "<pdf>" + _texto_pdf(r.content)
+                return r.text
+            ultimo = f"HTTP {r.status_code}"
+            if r.status_code == 404:
+                break
+        except Exception as e:
+            ultimo = str(e)
+        time.sleep(2 ** n * 3)
+    raise RuntimeError(f"No se pudo descargar {url}: {ultimo}")
+
+
+def numero(texto):
+    if texto is None:
+        return None
+    if isinstance(texto, (int, float)):
+        return float(texto)
+    t = re.sub(r"[^\d.,]", "", str(texto))
+    if not t:
+        return None
+    if "," in t and "." in t:
+        t = t.replace(",", "") if t.rfind(".") > t.rfind(",") else t.replace(".", "").replace(",", ".")
+    elif "," in t:
+        partes = t.split(",")
+        t = t.replace(",", "") if len(partes[-1]) == 3 else t.replace(",", ".")
+    elif t.count(".") > 1 or (t.count(".") == 1 and len(t.split(".")[-1]) == 3):
+        t = t.replace(".", "")
+    try:
+        return float(t)
+    except ValueError:
+        return None
+
+
+def precio(texto):
+    if not texto:
+        return None, None
+    t = str(texto).upper()
+    usd = re.search(r"(USD|US\$|\$)\s*([\d.,]+)", t)
+    pen = re.search(r"S/\.?\s*([\d.,]+)", t)
+    if usd:
+        return numero(usd.group(2)), "USD"
+    if pen:
+        return numero(pen.group(1)), "PEN"
+    return numero(t), None
+
+
+def a_usd(monto, moneda, tc):
+    if monto is None:
+        return None
+    return round(monto / tc, 2) if moneda == "PEN" else monto
+
+
+TIPOS = {
+    "departamento": ["departamento", "depa", "dpto", "flat", "duplex", "dúplex", "penthouse"],
+    "casa": ["casa", "chalet", "casa de playa"],
+    "local": ["local", "tienda", "comercial"],
+    "oficina": ["oficina"],
+    "terreno": ["terreno", "lote"],
+    "edificio": ["edificio"],
+}
+
+
+def tipo_desde(texto):
+    t = (texto or "").lower()
+    for tipo, palabras in TIPOS.items():
+        if any(p in t for p in palabras):
+            return tipo
+    return None
+
+
+def operacion_desde(texto):
+    t = (texto or "").lower()
+    if "alquiler" in t or "alquila" in t or "/mes" in t or "rent" in t:
+        return "alquiler"
+    return "venta"
+
+
+def estado_desde(texto):
+    t = (texto or "").lower()
+    if "remate" in t or "subasta" in t or "adjudicad" in t:
+        return "remate"
+    if "preventa" in t or "pre venta" in t or "pre-venta" in t:
+        return "preventa"
+    if "en planos" in t or "en construcción" in t or "en construccion" in t or "entrega" in t:
+        return "en_planos"
+    return "terminado"
+
+
+def ubicacion(texto):
+    partes = [p.strip() for p in re.split(r",", texto or "") if p.strip()]
+    if not partes:
+        return {}
+    if len(partes) >= 3:
+        return {"distrito": partes[-3], "provincia": partes[-2], "departamento": partes[-1], "direccion": ", ".join(partes[:-3]) or None}
+    if len(partes) == 2:
+        return {"distrito": partes[0], "provincia": partes[1], "departamento": partes[1]}
+    return {"distrito": partes[0]}
+
+
+def limpiar(item, tc):
+    item = {k: v for k, v in item.items() if v not in (None, "", [])}
+    if item.get("precio") is not None and not item.get("precio_usd"):
+        item["precio_usd"] = a_usd(item["precio"], item.get("moneda"), tc)
+    if item.get("mantenimiento") is not None:
+        item["mantenimiento_usd"] = a_usd(item.pop("mantenimiento"), item.get("moneda_mantenimiento", "PEN"), tc)
+    item.pop("moneda_mantenimiento", None)
+    for campo in ("dormitorios", "banos", "estacionamientos"):
+        if item.get(campo) is not None:
+            item[campo] = int(item[campo])
+    return item
+
+
+def valido(item):
+    return bool(item.get("url") and item.get("precio_usd") and item["precio_usd"] > 100 and item.get("operacion"))
