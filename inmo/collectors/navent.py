@@ -39,7 +39,7 @@ def parsear(html, base_url, selectores=None):
         if not ruta or ruta in vistos:
             continue
         vistos.add(ruta)
-        url = urljoin(base_url, ruta)
+        url = urljoin(base_url, ruta).split("?")[0]
         texto = lambda sel: " ".join(e.get_text(" ", strip=True) for e in card.select(sel)) if sel else ""
         monto, moneda = precio(texto(s["precio"]))
         mant, mon_mant = precio(texto(s["mantenimiento"]))
