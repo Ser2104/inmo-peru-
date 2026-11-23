@@ -46,6 +46,11 @@ def _abre(url):
         return False
 
 
+def _buscar():
+    from .busqueda import buscar_web
+    return buscar_web("proyectos inmobiliarios preventa Arequipa")
+
+
 def _exigir(condicion, mensaje):
     if not condicion:
         raise RuntimeError(mensaje)
@@ -68,6 +73,7 @@ def diagnostico(db):
     check("Funciones de mantenimiento", lambda: f"{db.rpc('tamano_db') / 1e6:.1f} MB usados")
     check("IA", lambda: _exigir(llm.disponible(), "falta GEMINI_API_KEY o ANTHROPIC_API_KEY") or (llm.pedir_json('Devuelve {"ok": true}', intentos=1) and "responde"))
     check("IA con búsqueda en internet", lambda: llm.pedir_json('Busca el tipo de cambio del dólar en Perú hoy y devuelve {"tc": número}', buscar=True, intentos=1) and "responde")
+    check("Buscador gratis", lambda: f"{len(_buscar())} resultados" if _buscar() else _exigir(False, "sin resultados"))
     check("BCRP", lambda: f"{len(bcrp._serie(bcrp.TIPO_CAMBIO, '2026-01-01', '2026-12-31'))} datos de tipo de cambio")
     check("Portales", lambda: ", ".join(f"{n}: {'ok' if _abre(u) else 'bloqueado'}" for n, u in PORTALES))
     check("Telegram", lambda: _exigir(telegram("Prueba del analizador inmobiliario ✅"), "no configurado") or "mensaje enviado")

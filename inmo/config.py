@@ -19,6 +19,9 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_REPO = os.getenv("GITHUB_REPOSITORY", "")
 
+SEARXNG_URL = os.getenv("SEARXNG_URL", "http://localhost:8080")
+BUSQUEDA_GOOGLE = os.getenv("BUSQUEDA_GOOGLE", "auto")
+
 MAX_PAGINAS = int(os.getenv("MAX_PAGINAS", "40"))
 MINUTOS_POR_PASO = int(os.getenv("MINUTOS_POR_PASO", "90"))
 

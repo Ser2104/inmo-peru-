@@ -66,7 +66,53 @@ def disponible():
     return any(PROVEEDORES[p][1]() for p in PROVEEDORES)
 
 
+_SIN_BUSQUEDA_NATIVA = set()
+
+PROMPT_CONSULTAS = """Para cumplir esta tarea necesitas buscar en internet. Escribe de 3 a 5 búsquedas cortas y distintas (como las escribirías en Google),
+en español, específicas para Perú. Devuelve una lista JSON de textos.
+
+TAREA:
+{tarea}"""
+
+PROMPT_RESPONDER = """{tarea}
+
+Usa SOLO la información de estos resultados de búsqueda y páginas (no inventes, usa null si falta un dato; las url deben salir de aquí):
+{contexto}"""
+
+
+def _buscar_gratis(prompt, intentos):
+    from . import busqueda
+    consultas = pedir_json(PROMPT_CONSULTAS.format(tarea=prompt[:3000]), intentos=intentos)
+    resultados, vistos = [], set()
+    for c in [str(x) for x in (consultas if isinstance(consultas, list) else [])][:5]:
+        for r in busqueda.buscar_web(c):
+            if r["url"] not in vistos:
+                vistos.add(r["url"])
+                resultados.append(r)
+    if not resultados:
+        raise RuntimeError("La búsqueda gratis no devolvió resultados")
+    partes = [f"- {r['titulo']} | {r['url']} | {r.get('resumen') or ''}" for r in resultados[:25]]
+    for r in resultados[:5]:
+        texto = busqueda.texto_pagina(r["url"])
+        if texto:
+            partes.append(f"\nPÁGINA {r['url']}:\n{texto}")
+    return pedir_json(PROMPT_RESPONDER.format(tarea=prompt, contexto="\n".join(partes)[:60000]), intentos=intentos)
+
+
 def pedir_json(prompt, buscar=False, intentos=3):
+    if buscar:
+        nativa = config.BUSQUEDA_GOOGLE != "no" and not _SIN_BUSQUEDA_NATIVA
+        if nativa:
+            try:
+                return _pedir(prompt, True, 1 if config.BUSQUEDA_GOOGLE == "auto" else intentos)
+            except RuntimeError as e:
+                if "429" in str(e) or "403" in str(e) or "quota" in str(e).lower():
+                    _SIN_BUSQUEDA_NATIVA.add(True)
+        return _buscar_gratis(prompt, intentos)
+    return _pedir(prompt, False, intentos)
+
+
+def _pedir(prompt, buscar, intentos):
     errores = []
     for nombre in _orden():
         llamar, clave = PROVEEDORES[nombre]

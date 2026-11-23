@@ -8,7 +8,7 @@ from datetime import date
 from . import config, mantenimiento
 from .db import DB
 from .collectors import bcrp, runner
-from .agents import analista, auditor, buscador, alertas, mejora, vigilante, explorador, temporal, ubicador
+from .agents import analista, auditor, buscador, alertas, mejora, vigilante, explorador, temporal, ubicador, rastreador
 
 
 class Tiempo(Exception):
@@ -46,7 +46,7 @@ def recolectar(db, p, completo):
 def main():
     ap = argparse.ArgumentParser(description="Analizador inmobiliario Perú")
     ap.add_argument("tarea", choices=["ciclo", "completo", "bcrp", "buscar", "analizar", "auditar", "alertas", "mejorar",
-                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar"])
+                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear"])
     ap.add_argument("--urls", nargs="*")
     ap.add_argument("--departamentos", nargs="*")
     a = ap.parse_args()
@@ -78,6 +78,8 @@ def main():
         paso(db, "temporal", lambda: temporal.ejecutar(db, p))
     if a.tarea in ("explorar", "completo"):
         paso(db, "explorador", lambda: explorador.ejecutar(db, p))
+    if a.tarea in ("rastrear", "completo"):
+        paso(db, "rastreador", lambda: rastreador.ejecutar(db, p))
     if a.tarea in ("ciclo", "verificar"):
         paso(db, "verificador", lambda: explorador.verificar(db, p))
     if a.tarea in ("ciclo", "completo", "auditar"):
