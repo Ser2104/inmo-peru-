@@ -27,6 +27,8 @@ def _cumple(fila, campo, cond):
         return a >= b if op == "gte" else a > b
     if op == "is":
         return v is None
+    if cond == "not.is.null":
+        return v is not None
     return True
 
 

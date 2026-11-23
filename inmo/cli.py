@@ -46,7 +46,7 @@ def recolectar(db, p, completo):
 def main():
     ap = argparse.ArgumentParser(description="Analizador inmobiliario Perú")
     ap.add_argument("tarea", choices=["ciclo", "completo", "bcrp", "buscar", "analizar", "auditar", "alertas", "mejorar",
-                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear"])
+                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear", "rapido"])
     ap.add_argument("--urls", nargs="*")
     ap.add_argument("--departamentos", nargs="*")
     a = ap.parse_args()
@@ -78,6 +78,10 @@ def main():
         paso(db, "temporal", lambda: temporal.ejecutar(db, p))
     if a.tarea in ("explorar", "completo"):
         paso(db, "explorador", lambda: explorador.ejecutar(db, p))
+    if a.tarea in ("completo", "rapido"):
+        paso(db, "auditor", lambda: auditor.ejecutar(db))
+        paso(db, "ubicador", lambda: ubicador.ejecutar(db))
+        paso(db, "analista", lambda: analista.ejecutar(db, p, todo=True))
     if a.tarea in ("rastrear", "completo"):
         paso(db, "rastreador", lambda: rastreador.ejecutar(db, p))
     if a.tarea in ("ciclo", "verificar"):

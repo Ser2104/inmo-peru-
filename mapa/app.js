@@ -8,9 +8,16 @@ const DEMO = new URLSearchParams(location.search).has("demo");
 const estado = { capa: "inversion", horizonte: "total", veredictos: new Set(["Comprar", "Negociar", "Revisar a mano"]), zonas: false };
 let inmuebles = [], arbitrajes = [], sb = null;
 
-const mapa = L.map("mapa", { zoomControl: false }).setView([-9.2, -75.0], 5);
+const PERU = L.latLngBounds([-18.6, -81.6], [0.2, -68.4]);
+const mapa = L.map("mapa", { zoomControl: false, maxBounds: PERU.pad(0.15), maxBoundsViscosity: 1, minZoom: 5 }).fitBounds(PERU);
 L.control.zoom({ position: "bottomright" }).addTo(mapa);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(mapa);
+fetch("peru.json").then((r) => r.json()).then((peru) => {
+  const mundo = [[-90, -180], [-90, 180], [90, 180], [90, -180]];
+  const anillos = peru.type === "MultiPolygon" ? peru.coordinates.map((p) => p[0]) : [peru.coordinates[0]];
+  L.polygon([mundo, ...anillos.map((a) => a.map(([lng, lat]) => [lat, lng]))], { stroke: false, fillColor: "#fff", fillOpacity: 0.75, interactive: false }).addTo(mapa);
+  L.polygon(anillos.map((a) => a.map(([lng, lat]) => [lat, lng])), { color: "#2563eb", weight: 1.5, fill: false, interactive: false }).addTo(mapa);
+}).catch(() => {});
 const grupo = L.markerClusterGroup({
   showCoverageOnHover: false, maxClusterRadius: 45,
   iconCreateFunction: (c) => {
@@ -192,7 +199,7 @@ async function cargar() {
   if (!inmuebles.length && !arbitrajes.length) $("cargando").textContent = "Aún no hay inmuebles analizados. Los agentes los irán agregando.";
   opciones();
   dibujar();
-  if (inmuebles.length) mapa.fitBounds(L.latLngBounds(inmuebles.map((i) => [i.lat, i.lng])), { maxZoom: 13, padding: [30, 30] });
+  if (inmuebles.length) mapa.fitBounds(L.latLngBounds(inmuebles.map((i) => [i.lat, i.lng])), { maxZoom: 12, padding: [20, 20] });
 }
 
 document.querySelectorAll("[data-cierra]").forEach((b) => b.onclick = () => $(b.dataset.cierra).classList.remove("abierto"));
