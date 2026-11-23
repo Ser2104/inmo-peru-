@@ -20,15 +20,18 @@ MODELOS_GEMINI = ["gemini-flash-latest", "gemini-3-flash-preview", "gemini-3.1-f
 
 
 def _gemini(prompt, buscar):
-    cuerpo = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
+    cuerpo = {"contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": {"thinkingConfig": {"thinkingLevel": "low"}}}
     if buscar:
         cuerpo["tools"] = [{"google_search": {}}]
     else:
-        cuerpo["generationConfig"] = {"responseMimeType": "application/json"}
+        cuerpo["generationConfig"]["responseMimeType"] = "application/json"
     modelos = list(dict.fromkeys([m for m in [config.GEMINI_MODEL] if m] + MODELOS_GEMINI))
     for modelo in modelos:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
         r = httpx.post(url, headers={"x-goog-api-key": config.GEMINI_API_KEY}, json=cuerpo, timeout=180)
+        if r.status_code == 400 and "thinking" in r.text.lower():
+            cuerpo["generationConfig"].pop("thinkingConfig", None)
+            r = httpx.post(url, headers={"x-goog-api-key": config.GEMINI_API_KEY}, json=cuerpo, timeout=180)
         if r.status_code in (404, 429, 500, 503) and modelo != modelos[-1]:
             continue
         r.raise_for_status()
