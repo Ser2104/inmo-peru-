@@ -1,3 +1,4 @@
+import math
 import statistics
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -87,6 +88,33 @@ def buscar_zona(indice, inm, operacion, minimo, mismo_segmento=False, hasta="pro
     return None, None
 
 
+def grupos_parecidos(inmuebles):
+    g = {}
+    for i in inmuebles:
+        if not i.get("activo", True) or i.get("duplicado_de") or i.get("sospechoso") or not i.get("precio_usd") or float(i.get("area_m2") or 0) < 10:
+            continue
+        g.setdefault((norm(i.get("departamento")), norm(i.get("provincia")), norm(i.get("distrito")), i.get("tipo"), i["operacion"]), []).append(i)
+    return g
+
+
+def parecidos(inm, grupos, operacion, maximo=8):
+    area, dorm = float(inm.get("area_m2") or 0), inm.get("dormitorios")
+    if not area or not grupos:
+        return []
+    clave = (norm(inm.get("departamento")), norm(inm.get("provincia")), norm(inm.get("distrito")), inm.get("tipo"), operacion)
+    c = [x for x in grupos.get(clave, []) if x.get("id") != inm.get("id") and 0.75 <= float(x["area_m2"]) / area <= 1.33
+         and (not dorm or not x.get("dormitorios") or abs(int(x["dormitorios"]) - int(dorm)) <= 1)]
+    if operacion == "venta":
+        mismo = [x for x in c if segmento(x) == segmento(inm)]
+        c = mismo if len(mismo) >= 5 else c
+    c.sort(key=lambda x: abs(math.log(float(x["area_m2"]) / area)))
+    return c[:maximo]
+
+
+def _resumen(lista):
+    return [{"url": x.get("url"), "precio_usd": float(x["precio_usd"]), "area_m2": float(x["area_m2"]), "dormitorios": x.get("dormitorios")} for x in lista]
+
+
 def estimar_renta(inm, indice, per_distrito, p):
     area = float(inm.get("area_m2") or 0)
     if inm.get("tipo") == "terreno":
@@ -124,16 +152,23 @@ def meses_hasta_renta(inm, ahora=None):
     return 24
 
 
-def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None):
+def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None, grupos=None):
     riesgos = []
     precio, area = float(inm["precio_usd"]), float(inm.get("area_m2") or 0)
+    alq = parecidos(inm, grupos, "alquiler") if inm.get("tipo") != "terreno" else []
+    ven = parecidos(inm, grupos, "venta")
     if renta_usuario:
         renta, fuente_renta, n_alq = float(renta_usuario), "usuario", 0
+    elif len(alq) >= 5:
+        renta = statistics.median(float(x["precio_usd"]) / float(x["area_m2"]) for x in alq) * area * p["ajuste_renta"]
+        fuente_renta, n_alq = "parecidos", len(alq)
     else:
         renta, fuente_renta, n_alq = estimar_renta(inm, indice, per_distrito, p)
     zv, nivel_v = buscar_zona(indice, inm, "venta", p["min_comparables"])
     descuento = None
-    if zv and area:
+    if len(ven) >= 5:
+        descuento = 1 - (precio / area) / statistics.median(float(x["precio_usd"]) / float(x["area_m2"]) for x in ven)
+    elif zv and area:
         descuento = 1 - (precio / area) / (zv["mediana_m2_usd"] * factor_tamano(area))
     plusvalia = p["plusvalia_default"]
     if zv and zv.get("plusvalia_anual") is not None and zv["n"] >= 30:
@@ -213,7 +248,7 @@ def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None):
         if est["nivel"] != "distrito" or est["fuentes"] < 2:
             riesgos.append(f"Datos de Airbnb solo a nivel de {est['nivel']} y de {est['fuentes']} fuente(s)")
 
-    if fuente_renta.startswith("comparables_distrito") and (nivel_v or "").startswith("distrito") and n_alq >= 15:
+    if (fuente_renta == "parecidos" or inm.get("tipo") == "terreno") and len(ven) >= 5 or fuente_renta.startswith("comparables_distrito") and (nivel_v or "").startswith("distrito") and n_alq >= 15 and len(ven) >= 5:
         confianza = "alta"
     elif fuente_renta not in ("supuesto", "rentabilidad_departamento") and zv:
         confianza = "media"
@@ -234,6 +269,7 @@ def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None):
     pes_ok = pes is not None and pes >= p.get("tir_minima_peor_caso", 0.03)
     frenos = [m for falla, m in (
         (confianza != "alta", "pocos datos de la zona"),
+        (len(ven) < 5 or (inm.get("tipo") != "terreno" and len(alq) < 5), "menos de 5 inmuebles parecidos (mismo distrito, tamaño y dormitorios) para confirmar precio y alquiler"),
         (not (nivel_v or "").startswith("distrito"), "sin comparación en el mismo distrito"),
         (bruta > 0.12 or inm.get("sospechoso"), "datos dudosos"),
         ((descuento or 0) > 0.30, "precio demasiado bajo para ser normal"),
@@ -288,6 +324,7 @@ def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None):
             "meses_hasta_renta": s.meses_hasta_renta,
             "zona_venta": zv, "nivel_zona_venta": nivel_v,
             "comparables_alquiler": n_alq,
+            "parecidos": {"alquiler": _resumen(alq), "venta": _resumen(ven)},
             "inversion_inicial": r["inversion_inicial"],
             "costos_compra": r["costos_compra"],
             "cuota_hipoteca_mensual": r["cuota_hipoteca_mensual"],

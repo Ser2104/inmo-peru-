@@ -33,8 +33,10 @@ def sospechosos(inmuebles, indice):
             motivo = f"área rara ({area} m²)"
         elif i["operacion"] == "venta" and precio < 5000:
             motivo = "precio de venta demasiado bajo"
-        elif i["operacion"] == "alquiler" and precio > 30000:
+        elif i["operacion"] == "alquiler" and (precio > 30000 or (i.get("tipo") in ("departamento", "casa") and precio > 8000)):
             motivo = "alquiler demasiado alto (¿es venta?)"
+        elif i["operacion"] == "venta" and i.get("tipo") in ("departamento", "casa") and precio < 15000:
+            motivo = "vivienda demasiado barata (¿es alquiler o un dato mal leído?)"
         elif area:
             z, _ = buscar_zona(indice, i, i["operacion"], 10)
             if z:

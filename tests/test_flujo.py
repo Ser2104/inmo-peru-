@@ -22,13 +22,13 @@ def test_flujo_completo(monkeypatch):
         m.update(url=f"https://x.pe/{len(db.t['inmuebles'])}", activo=True, ultima_vez=mercado()[0]["primera_vez"])
         db.upsert("inmuebles", m)
     db.upsert("inmuebles", {"url": "https://x.pe/ganga", "operacion": "venta", "tipo": "departamento", "departamento": "Lima",
-                            "provincia": "Lima", "distrito": "Miraflores", "area_m2": 90, "precio_usd": 90 * 1700, "activo": True,
+                            "provincia": "Lima", "distrito": "Miraflores", "area_m2": 90, "precio_usd": 90 * 1900, "activo": True,
                             "ultima_vez": mercado()[0]["primera_vez"]})
 
     auditor.ejecutar(db)
     res = analista.ejecutar(db, p)
     assert res["analizados"] >= 42
-    ganga = next(a for a in db.t["analisis"] if a["precio_usd"] == 90 * 1700)
+    ganga = next(a for a in db.t["analisis"] if a["precio_usd"] == 90 * 1900)
     assert ganga["veredicto"] == "Comprar" and ganga["detalle"]["escenarios"]["pesimista"]["tir_10"] >= 0.03
 
     enviados = []

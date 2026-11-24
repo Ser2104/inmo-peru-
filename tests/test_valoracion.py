@@ -2,7 +2,7 @@ import random
 from datetime import datetime, timedelta, timezone
 
 from inmo.config import PARAMETROS_BASE as P
-from inmo.valoracion import calcular_zonas, indice_zonas, analizar
+from inmo.valoracion import calcular_zonas, indice_zonas, analizar, grupos_parecidos
 from inmo.agents.auditor import duplicados, sospechosos
 
 AHORA = datetime.now(timezone.utc)
@@ -29,11 +29,14 @@ def test_zonas_y_analisis():
     barato = {"id": "x", "operacion": "venta", "tipo": "departamento", "departamento": "Lima", "provincia": "Lima",
               "distrito": "Miraflores", "area_m2": 90, "precio_usd": 90 * 1700}
     caro = {**barato, "id": "y", "precio_usd": 90 * 3400}
-    a, b = analizar(barato, idx, {}, P), analizar(caro, idx, {}, P)
-    assert a["fuente_renta"] == "comparables_distrito" and a["confianza"] == "alta"
+    g = grupos_parecidos(mercado())
+    a, b = analizar(barato, idx, {}, P, grupos=g), analizar(caro, idx, {}, P, grupos=g)
+    assert a["fuente_renta"] == "parecidos" and a["confianza"] == "alta"
+    assert len(a["detalle"]["parecidos"]["venta"]) == 8 and all(67 <= x["area_m2"] <= 120 for x in a["detalle"]["parecidos"]["alquiler"])
+    assert analizar(barato, idx, {}, P)["confianza"] != "alta"
     assert a["descuento_vs_zona"] > 0.25 and b["descuento_vs_zona"] < 0
     assert a["puntaje_total"] > b["puntaje_total"]
-    assert a["veredicto"] in ("Comprar", "Negociar") and b["veredicto"] == "Descartar"
+    assert a["veredicto"] in ("Comprar", "Negociar", "Revisar a mano") and b["veredicto"] == "Descartar"
     assert set(a["detalle"]["escenarios"]) == {"pesimista", "base", "optimista"}
 
 

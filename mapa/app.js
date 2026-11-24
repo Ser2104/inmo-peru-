@@ -168,10 +168,24 @@ async function abrir(i) {
       <div class="dato"><small>Te quedaría al mes</small><b>${usd(dias ? i.flujo_mensual_temporal : i.flujo_mensual_usd)}</b></div>
       <div class="dato"><small>Ganancia anual (10 años)</small><b>${pct(dias ? i.tir_10_temporal : i.tir_10)}</b></div>
       <div class="dato"><small>Frente a su zona</small><b>${i.descuento_vs_zona == null ? "—" : Math.abs(i.descuento_vs_zona * 100).toFixed(0) + "% " + (i.descuento_vs_zona > 0 ? "más barato" : "más caro")}</b></div>
-    </div>${aprox}<div id="extra"><p class="sub" style="margin-top:14px">Cargando análisis completo…</p></div>${enlace}`;
+    </div>${confirmacion(i)}${aprox}<div id="extra"><p class="sub" style="margin-top:14px">Cargando análisis completo…</p></div>${enlace}`;
   abrirPanel("detalle");
   const a = DEMO ? i._analisis : (await sb.from("analisis").select("riesgos,detalle,renta_mensual_usd").eq("inmueble_id", i.id).single()).data;
   $("extra").innerHTML = a ? completo(a) : "";
+}
+
+function confirmacion(i) {
+  if (!i.confirmacion) return i.veredicto === "Comprar" ? '<div class="aviso">⏳ Aún no se confirmó el aviso. Se revisa en el próximo ciclo.</div>' : "";
+  const fecha = new Date(i.confirmado).toLocaleDateString("es-PE");
+  return { ok: `<div class="aviso" style="background:#e7f5ec">✅ Confirmado el ${fecha}: el aviso sigue publicado y el precio coincide.</div>`,
+    precio_cambio: `<div class="aviso">⚠️ Revisado el ${fecha}: el precio del aviso cambió.</div>`,
+    no_verificable: `<div class="aviso">⚠️ Revisado el ${fecha}: no se pudo abrir el aviso; confírmalo tú.</div>`,
+    no_disponible: `<div class="aviso">❌ Revisado el ${fecha}: el aviso ya no está publicado.</div>` }[i.confirmacion] || "";
+}
+
+function listaParecidos(titulo, lista, alquiler) {
+  if (!lista?.length) return "";
+  return `<h3>${titulo}</h3><table><tr><th>Precio</th><th>Área</th><th>Dorm.</th><th></th></tr>${lista.map((x) => `<tr><td>${usd(x.precio_usd)}${alquiler ? "/mes" : ""}</td><td>${Math.round(x.area_m2)} m²</td><td>${x.dormitorios ?? "—"}</td><td>${x.url?.startsWith("http") ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(dominio(x.url))}</a>` : ""}</td></tr>`).join("")}</table>`;
 }
 
 function completo(a) {
@@ -185,7 +199,7 @@ function completo(a) {
     ${["pesimista", "base", "optimista"].map((k) => `<tr><td>${{ pesimista: "Peor caso", base: "Normal", optimista: "Mejor caso" }[k]}</td><td>${pct(e[k]?.tir_10)}</td><td>${usd(e[k]?.flujo_mensual_usd)}</td></tr>`).join("")}</table>` : "";
   const flujos = (d.flujos_10 || []).map((f, t) => `<tr><td>${t === 0 ? "Compra" : "Año " + t}</td><td style="color:${f < 0 ? COLOR.rojo : COLOR.verde}">${usd(f)}</td></tr>`).join("");
   return `<h3>Ten en cuenta</h3><ul>${(a.riesgos || []).map((r) => `<li>${esc(r)}</li>`).join("") || "<li>Sin alertas importantes</li>"}</ul>
-    ${comp}${esc3}
+    ${comp}${esc3}${d.parecidos ? `<p class="sub" style="margin-top:12px">Así se confirmó el precio y el alquiler: con estos avisos del mismo distrito, de tamaño y dormitorios parecidos.</p>` + listaParecidos("Parecidos en venta", d.parecidos.venta) + listaParecidos("Parecidos en alquiler", d.parecidos.alquiler, true) : ""}
     <h3>Dinero que entra y sale</h3><p class="sub">Incluye gastos de compra, impuestos y la venta al final del año 10.</p><table>${flujos}</table>
     <p class="sub" style="margin-top:12px">Inversión inicial ${usd(d.inversion_inicial)} · alquiler tradicional estimado ${usd(a.renta_mensual_usd)}/mes · plusvalía usada ${pct(d.plusvalia_usada)}.<br>Es una estimación automática: revisa SUNARP, deudas y el estado del inmueble antes de comprar.</p>`;
 }

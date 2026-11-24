@@ -3,7 +3,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from .base import precio, numero, ubicacion, tipo_desde, operacion_desde, estado_desde
+from .base import precio, numero, ubicacion, tipo_desde, operacion_desde, estado_desde, titulo_desde_url
 
 SELECTORES = {
     "tarjeta": "[data-qa^='posting'], [data-to-posting]",
@@ -65,6 +65,8 @@ def parsear(html, base_url, selectores=None):
         direccion = texto(s["direccion"])
         if direccion:
             item["direccion"] = direccion
+        if not re.search(r"[a-záéíóúñ]{4}", re.sub(r"(?i)usd|s/", "", item["titulo"])):
+            item["titulo"] = titulo_desde_url(url) or item["titulo"]
         pista = f"{url} {item['titulo']} {desc}"
         slug = re.search(r"/(?:clasificado|proyecto)/[a-z]+-(?:proyecto-|venta-de-|alquiler-de-)?([a-z-]+?)-(?:en|lima|\d)", url)
         item["tipo"] = tipo_desde(slug.group(1).replace("-", " ")) if slug and tipo_desde(slug.group(1).replace("-", " ")) else tipo_desde(pista)

@@ -2,10 +2,10 @@ from ..collectors import base
 from datetime import datetime, timedelta, timezone
 
 from .. import temporal as tmp
-from ..valoracion import calcular_zonas, indice_zonas, analizar
+from ..valoracion import calcular_zonas, indice_zonas, analizar, grupos_parecidos
 from . import temporal as agente_temporal
 
-CAMPOS = "id,url,tipo,operacion,estado,departamento,provincia,distrito,area_m2,dormitorios,banos,lat,lng,precio_usd,mantenimiento_usd,fecha_entrega,activo,duplicado_de,sospechoso,primera_vez,ultima_vez"
+CAMPOS = "id,url,titulo,tipo,operacion,estado,departamento,provincia,distrito,area_m2,dormitorios,banos,lat,lng,precio_usd,mantenimiento_usd,fecha_entrega,activo,duplicado_de,sospechoso,primera_vez,ultima_vez"
 
 
 def cargar(db):
@@ -25,6 +25,7 @@ def ejecutar(db, p, todo=False):
     vence = datetime.now(timezone.utc) - timedelta(days=7)
     per = p.get("per_distrito") or {}
     temporal = agente_temporal.cargar(db)
+    grupos = grupos_parecidos(inmuebles)
     salida, arbitrajes = [], []
     for inm in inmuebles:
         if inm.get("duplicado_de") or not inm.get("precio_usd") or inm.get("sospechoso") or inm.get("tipo") in base.NO_EVALUABLES:
@@ -39,7 +40,7 @@ def ejecutar(db, p, todo=False):
         prev = previos.get(inm["id"])
         if not todo and prev and float(prev["precio_usd"] or 0) == float(inm["precio_usd"]) and datetime.fromisoformat(prev["fecha"].replace("Z", "+00:00")) > vence:
             continue
-        a = analizar(inm, indice, per, p, temporal=temporal)
+        a = analizar(inm, indice, per, p, temporal=temporal, grupos=grupos)
         a["fecha"] = datetime.now(timezone.utc).isoformat()
         salida.append(a)
     db.upsert("analisis", salida, on_conflict="inmueble_id")

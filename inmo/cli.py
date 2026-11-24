@@ -8,7 +8,7 @@ from datetime import date
 from . import config, mantenimiento
 from .db import DB
 from .collectors import bcrp, runner
-from .agents import analista, auditor, buscador, alertas, mejora, vigilante, explorador, temporal, ubicador, rastreador, concesiones
+from .agents import analista, auditor, buscador, alertas, mejora, vigilante, explorador, temporal, ubicador, rastreador, concesiones, confirmador
 
 
 class Tiempo(Exception):
@@ -46,7 +46,7 @@ def recolectar(db, p, completo):
 def main():
     ap = argparse.ArgumentParser(description="Analizador inmobiliario Perú")
     ap.add_argument("tarea", choices=["ciclo", "completo", "bcrp", "buscar", "analizar", "auditar", "alertas", "mejorar",
-                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear", "rapido", "concesiones"])
+                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear", "rapido", "concesiones", "confirmar"])
     ap.add_argument("--urls", nargs="*")
     ap.add_argument("--departamentos", nargs="*")
     a = ap.parse_args()
@@ -79,6 +79,8 @@ def main():
         paso(db, "ubicador", lambda: ubicador.ejecutar(db))
     if a.tarea in ("ciclo", "completo", "analizar"):
         paso(db, "analista", lambda: analista.ejecutar(db, p, todo=a.tarea != "ciclo"))
+    if a.tarea in ("ciclo", "completo", "analizar", "confirmar"):
+        paso(db, "confirmador", lambda: confirmador.ejecutar(db))
     if a.tarea in ("ciclo", "completo", "alertas"):
         paso(db, "alertas", lambda: alertas.ejecutar(db, p))
     if a.tarea in ("temporal", "completo"):
@@ -98,6 +100,7 @@ def main():
         paso(db, "mejora", lambda: mejora.ejecutar(db, p))
     if a.tarea == "completo":
         paso(db, "analista", lambda: analista.ejecutar(db, db.parametros(), todo=True))
+        paso(db, "confirmador", lambda: confirmador.ejecutar(db))
     if a.tarea in ("ciclo", "completo", "vigilar"):
         paso(db, "vigilante", lambda: vigilante.ejecutar(db, db.parametros()))
 

@@ -97,15 +97,23 @@ TIPOS = {
     "deposito": ["depósito", "deposito", "baulera"],
     "estacionamiento": ["estacionamiento", "cochera", "parking"],
     "aires": ["aires", "azotea"],
+    "industrial": ["local industrial", "almacén", "almacen", "galpón", "galpon", "nave industrial", "planta industrial"],
 }
 NO_EVALUABLES = ("deposito", "estacionamiento", "aires", "otros")
 
 
 def tipo_desde(texto):
     t = (texto or "").lower()
-    pos = {tipo: min((t.find(p) for p in palabras if p in t), default=-1) for tipo, palabras in TIPOS.items()}
-    pos = {k: v for k, v in pos.items() if v >= 0}
-    return min(pos, key=pos.get) if pos else None
+    hallados = [(t.find(p), -len(p), tipo) for tipo, palabras in TIPOS.items() for p in palabras if p in t]
+    return min(hallados)[2] if hallados else None
+
+
+def titulo_desde_url(url):
+    m = re.search(r"/(?:clasificado|proyecto)/[a-z]+-([a-z0-9-]+)", url or "")
+    if not m:
+        return None
+    texto = re.sub(r"(-\d+)+(\.html)?$", "", m.group(1)).replace("-", " ").strip()
+    return texto[:1].upper() + texto[1:] if texto else None
 
 
 def operacion_desde(texto):
