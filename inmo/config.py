@@ -8,9 +8,9 @@ API_URL = os.getenv("INMO_API_URL", "")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER") or ("openai" if os.getenv("OPENAI_API_KEY") else "gemini")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "")
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL") or "https://flash.luminal.cloud/v1"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL") or "deepseek-ai/DeepSeek-V4.1-Flash"
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5")
 
