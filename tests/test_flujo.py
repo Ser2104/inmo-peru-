@@ -29,7 +29,7 @@ def test_flujo_completo(monkeypatch):
     res = analista.ejecutar(db, p)
     assert res["analizados"] >= 42
     ganga = next(a for a in db.t["analisis"] if a["precio_usd"] == 90 * 1700)
-    assert ganga["veredicto"] == "Comprar"
+    assert ganga["veredicto"] == "Comprar" and ganga["detalle"]["escenarios"]["pesimista"]["tir_10"] >= 0.03
 
     enviados = []
     monkeypatch.setattr(alertas, "enviar", enviados.append)

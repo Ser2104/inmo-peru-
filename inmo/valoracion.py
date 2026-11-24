@@ -231,9 +231,23 @@ def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None):
         riesgos.append("Precio 'desde': corresponde a la unidad más barata del proyecto; confirma área y precio de la unidad que te interesa")
     if inm.get("tipo") == "terreno":
         riesgos.append("Terreno: se evalúa solo por precio frente a la zona y plusvalía, sin alquiler")
-    confiable = confianza != "baja" and (nivel_v or "").startswith("distrito") and bruta <= 0.12 and not inm.get("sospechoso")
+    pes_ok = pes is not None and pes >= p.get("tir_minima_peor_caso", 0.03)
+    frenos = [m for falla, m in (
+        (confianza != "alta", "pocos datos de la zona"),
+        (not (nivel_v or "").startswith("distrito"), "sin comparación en el mismo distrito"),
+        (bruta > 0.12 or inm.get("sospechoso"), "datos dudosos"),
+        ((descuento or 0) > 0.30, "precio demasiado bajo para ser normal"),
+        (not pes_ok, "en el peor caso no gana lo suficiente"),
+        (desde, "precio 'desde'"),
+        (bool(s.meses_hasta_renta), "aún no está construido"),
+        (inm.get("estado") == "remate", "remate"),
+        (not area or inm.get("tipo") == "terreno", "sin área o es terreno"),
+        (precio > pmax, "cuesta más de lo que conviene pagar"),
+    ) if falla]
     if total >= 7.5:
-        veredicto = "Comprar" if confiable and (descuento or 0) <= 0.30 else "Revisar a mano"
+        veredicto = "Revisar a mano" if frenos else "Comprar"
+        if frenos:
+            riesgos.append("No llega a 'Comprar' porque: " + ", ".join(frenos))
     elif total >= 6 or pmax >= precio * 0.9:
         veredicto = "Negociar"
     else:
