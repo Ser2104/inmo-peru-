@@ -104,7 +104,13 @@ def renormalizar(db):
 
 def probar(urls):
     from .collectors import base, navent, ia
+    from .agents import confirmador
     for url in urls:
+        try:
+            estado, final, html = confirmador.abrir(url)
+            print("confirmador:", estado, final[:100], len(html), "cifras:", sorted(n for n in confirmador.numeros(html) if len(n) >= 5)[:12])
+        except Exception as e:
+            print("confirmador falló:", e)
         try:
             html = base.descargar(url, intentos=1, pausa=(0, 0))
         except RuntimeError as e:
