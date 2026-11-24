@@ -108,7 +108,7 @@ def probar(urls):
     for url in urls:
         try:
             estado, final, html = confirmador.abrir(url)
-            print("confirmador:", estado, final[:100], len(html), "cifras:", sorted(n for n in confirmador.numeros(html) if len(n) >= 5)[:12])
+            print("confirmador:", estado, final[:100], len(html), "cifras:", [n for n in ("118000", "229000") if n in confirmador.numeros(html)])
         except Exception as e:
             print("confirmador falló:", e)
         try:

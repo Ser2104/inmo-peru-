@@ -16,7 +16,7 @@ def abrir(url):
 
 
 def numeros(texto):
-    return {re.sub(r"\D", "", n) for n in re.findall(r"\d[\d.,\s]{2,}\d", texto)}
+    return {re.sub(r"\D", "", n) for n in re.findall(r"(?<![\d.,])(?:\d{1,3}(?:[.,\u00a0 ]\d{3})+|\d{4,})(?![\d])", texto)}
 
 
 def revisar(inm, abrir_fn=abrir):
