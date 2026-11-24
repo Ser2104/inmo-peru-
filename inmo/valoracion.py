@@ -244,7 +244,10 @@ def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None):
         (not area or inm.get("tipo") == "terreno", "sin área o es terreno"),
         (precio > pmax, "cuesta más de lo que conviene pagar"),
     ) if falla]
-    if total >= 7.5:
+    if bruta > 0.15:
+        corto = mediano = largo = total = None
+        veredicto = "Revisar a mano"
+    elif total >= 7.5:
         veredicto = "Revisar a mano" if frenos else "Comprar"
         if frenos:
             riesgos.append("No llega a 'Comprar' porque: " + ", ".join(frenos))

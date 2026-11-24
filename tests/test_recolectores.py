@@ -72,3 +72,10 @@ def test_guardar_salta_fila_rechazada():
     db = DBQuisquillosa()
     filas = runner.guardar(db, [{"url": "a", "operacion": "venta", "precio_usd": 1e5}, {"url": "b", "operacion": "mala"}])
     assert [f["url"] for f in filas] == ["a"]
+
+
+def test_tipo_por_primera_palabra():
+    from inmo.collectors.base import tipo_desde
+    assert tipo_desde("Depósito en San Isidro") == "deposito"
+    assert tipo_desde("Departamento con cochera en Cayma") == "departamento"
+    assert tipo_desde("Venta de cochera en edificio") == "estacionamiento"

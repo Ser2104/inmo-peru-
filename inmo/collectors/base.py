@@ -94,15 +94,18 @@ TIPOS = {
     "oficina": ["oficina"],
     "terreno": ["terreno", "lote"],
     "edificio": ["edificio"],
+    "deposito": ["depósito", "deposito", "baulera"],
+    "estacionamiento": ["estacionamiento", "cochera", "parking"],
+    "aires": ["aires", "azotea"],
 }
+NO_EVALUABLES = ("deposito", "estacionamiento", "aires", "otros")
 
 
 def tipo_desde(texto):
     t = (texto or "").lower()
-    for tipo, palabras in TIPOS.items():
-        if any(p in t for p in palabras):
-            return tipo
-    return None
+    pos = {tipo: min((t.find(p) for p in palabras if p in t), default=-1) for tipo, palabras in TIPOS.items()}
+    pos = {k: v for k, v in pos.items() if v >= 0}
+    return min(pos, key=pos.get) if pos else None
 
 
 def operacion_desde(texto):

@@ -94,7 +94,7 @@ def airroi_inmuebles(db, limite):
     if not config.AIRROI_API_KEY:
         return 0
     hechos = {f["clave"] for f in db.select_all("mercado_temporal", select="clave", fuente="eq.airroi_inmueble")}
-    candidatos = db.select("analisis", select="inmueble_id,puntaje_total", order="puntaje_total.desc", limit=str(limite * 3))
+    candidatos = db.select("analisis", select="inmueble_id,puntaje_total", puntaje_total="not.is.null", order="puntaje_total.desc", limit=str(limite * 3))
     ids = [c["inmueble_id"] for c in candidatos if f"airroi:{c['inmueble_id']}" not in hechos][:limite]
     if not ids:
         return 0

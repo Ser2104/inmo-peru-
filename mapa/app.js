@@ -159,7 +159,7 @@ async function abrir(i) {
   }
   const dias = i.estrategia === "temporal";
   p.innerHTML = encabezado(i, i.veredicto, COLOR_VEREDICTO[i.veredicto] ?? COLOR.rojo) + `
-    <span class="sub"> &nbsp;Puntaje ${i.puntaje_total?.toFixed(1)}/10 · confianza ${esc(i.confianza)}</span>
+    <span class="sub"> &nbsp;${i.puntaje_total == null ? "Puntaje no confiable: datos del aviso dudosos" : `Puntaje ${i.puntaje_total.toFixed(1)}/10 · confianza ${esc(i.confianza)}`}</span>
     <div class="plazos">${barra("Corto plazo", i.puntaje_corto)}${barra("Mediano plazo", i.puntaje_mediano)}${barra("Largo plazo", i.puntaje_largo)}</div>
     <div class="grid">
       <div class="dato"><small>Precio</small><b>${usd(i.precio_usd)}</b></div>

@@ -1,3 +1,4 @@
+from ..collectors import base
 from datetime import datetime, timedelta, timezone
 
 from .. import temporal as tmp
@@ -26,7 +27,7 @@ def ejecutar(db, p, todo=False):
     temporal = agente_temporal.cargar(db)
     salida, arbitrajes = [], []
     for inm in inmuebles:
-        if inm.get("duplicado_de") or not inm.get("precio_usd") or inm.get("sospechoso"):
+        if inm.get("duplicado_de") or not inm.get("precio_usd") or inm.get("sospechoso") or inm.get("tipo") in base.NO_EVALUABLES:
             continue
         if inm["operacion"] == "alquiler":
             if inm.get("tipo") in ("departamento", "casa", None):
