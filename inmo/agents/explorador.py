@@ -89,7 +89,8 @@ def guardar_pistas(db, pistas, categoria, departamento):
     return len(nuevas)
 
 
-def explorar(db, p, cantidad=6):
+def explorar(db, p, cantidad=None):
+    cantidad = cantidad or (25 if config.OPENAI_API_KEY else 6)
     if not llm.disponible():
         return {"omitido": "sin clave de IA"}
     stats = p.get("explorador_stats") or {}
@@ -124,7 +125,8 @@ def _a_inmuebles(items, pista, tc):
     return salida
 
 
-def verificar(db, p, limite=25):
+def verificar(db, p, limite=None):
+    limite = limite or (150 if config.OPENAI_API_KEY else 25)
     tc = p["tipo_cambio"]
     pendientes = db.select("pistas", select="*", estado="in.(nueva,incompleta)", intentos="lt.3", order="creado.desc", limit=str(limite))
     ok = 0

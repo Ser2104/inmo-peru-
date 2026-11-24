@@ -34,7 +34,7 @@ def ejecutar(db, p, departamentos=None):
         return {"omitido": "sin clave de IA"}
     fuentes = {f["id"] for f in db.select("fuentes", select="id")}
     resumen = {"departamentos": [], "nuevas_fuentes": [], "guardados": 0, "errores": []}
-    for dep in departamentos or _rotacion():
+    for dep in departamentos or (config.DEPARTAMENTOS if config.OPENAI_API_KEY else _rotacion()):
         resumen["departamentos"].append(dep)
         try:
             hallazgos = llm.pedir_json(PROMPT.format(dep=dep), buscar=True)

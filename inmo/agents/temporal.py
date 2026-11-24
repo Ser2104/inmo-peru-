@@ -113,7 +113,8 @@ def airroi_inmuebles(db, limite):
     return n
 
 
-def ejecutar(db, p, cantidad=6):
+def ejecutar(db, p, cantidad=None):
+    cantidad = cantidad or (len(ZONAS) if config.OPENAI_API_KEY else 6)
     resumen = {"zonas": [], "airroi": 0}
     if llm.disponible():
         for zona in elegir_zonas(db, cantidad):
