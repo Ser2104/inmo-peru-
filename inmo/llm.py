@@ -54,7 +54,24 @@ def _anthropic(prompt, buscar):
     return "".join(b.get("text", "") for b in r.json()["content"] if b["type"] == "text")
 
 
-PROVEEDORES = {"gemini": (_gemini, lambda: config.GEMINI_API_KEY), "anthropic": (_anthropic, lambda: config.ANTHROPIC_API_KEY)}
+def _openai(prompt, buscar):
+    r = httpx.post(
+        f"{config.OPENAI_BASE_URL.rstrip('/')}/chat/completions",
+        headers={"Authorization": f"Bearer {config.OPENAI_API_KEY}"},
+        json={"model": config.OPENAI_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1},
+        timeout=240,
+    )
+    if r.status_code >= 400:
+        raise httpx.HTTPStatusError(f"{r.status_code} en {config.OPENAI_MODEL}: {r.text[:300]}", request=r.request, response=r)
+    return r.json()["choices"][0]["message"]["content"]
+
+
+PROVEEDORES = {
+    "openai": (_openai, lambda: config.OPENAI_API_KEY and config.OPENAI_BASE_URL and config.OPENAI_MODEL),
+    "gemini": (_gemini, lambda: config.GEMINI_API_KEY),
+    "anthropic": (_anthropic, lambda: config.ANTHROPIC_API_KEY),
+}
+SIN_BUSQUEDA = {"openai"}
 
 
 def _orden():
@@ -116,7 +133,7 @@ def _pedir(prompt, buscar, intentos):
     errores = []
     for nombre in _orden():
         llamar, clave = PROVEEDORES[nombre]
-        if not clave():
+        if not clave() or (buscar and nombre in SIN_BUSQUEDA):
             continue
         for n in range(intentos):
             try:

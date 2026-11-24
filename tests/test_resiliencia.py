@@ -43,3 +43,19 @@ def test_gemini_salta_modelos_retirados(monkeypatch):
     monkeypatch.setattr(llm.httpx, "post", post)
     assert llm._gemini("x", False) == "[1]"
     assert usados == ["gemini-2.5-flash", "gemini-flash-latest"]
+
+
+def test_proveedor_compatible_openai_va_primero(monkeypatch):
+    monkeypatch.setattr(config, "LLM_PROVIDER", "openai")
+    monkeypatch.setattr(config, "OPENAI_API_KEY", "k")
+    monkeypatch.setattr(config, "OPENAI_BASE_URL", "https://api.luminal.test/v1")
+    monkeypatch.setattr(config, "OPENAI_MODEL", "modelo")
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "g")
+
+    def post(url, **k):
+        req = httpx.Request("POST", url)
+        assert url == "https://api.luminal.test/v1/chat/completions" and k["json"]["model"] == "modelo"
+        return httpx.Response(200, request=req, json={"choices": [{"message": {"content": '{"ok": 1}'}}]})
+
+    monkeypatch.setattr(llm.httpx, "post", post)
+    assert llm._pedir("x", False, 1) == {"ok": 1}
