@@ -114,10 +114,20 @@ function encabezado(i, veredicto, colorV) {
     <span class="veredicto" style="background:${colorV}">${esc(veredicto)}</span>`;
 }
 
+const dominio = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return null; } };
+
+function fuente(i, mensajeWa) {
+  const links = [i.url, i.mencionado_en].filter((u) => u && u.startsWith("http"));
+  const partes = links.map((u, n) => `<a class="btn" href="${esc(u.split("#")[0])}" target="_blank" rel="noopener">${n ? "Donde se mencionó" : "Ver en"} ${esc(dominio(u))} →</a>`);
+  if (i.telefono) partes.push(`<a class="btn" href="https://wa.me/${esc(i.telefono)}?text=${encodeURIComponent(mensajeWa || "Hola, vi su aviso y me interesa. ¿Sigue disponible?")}" target="_blank" rel="noopener">WhatsApp +${esc(i.telefono)}</a>`);
+  const quien = [i.entidad, i.constructora].filter(Boolean).map(esc).join(" · ");
+  return `<h3>Fuente y contacto</h3><p class="sub">${quien ? quien + "<br>" : ""}Datos tomados de ${esc(links.map(dominio).join(" y ") || "WhatsApp")}. Confirma precio y disponibilidad directamente.</p><div class="fila">${partes.join(" ") || '<span class="sub">Sin enlace: usa 📞 Contactar.</span>'}</div>`;
+}
+
 async function abrir(i) {
   const p = $("contenido");
   const aprox = i.ubicacion_precision === "distrito" ? '<div class="aviso">📍 Ubicación aproximada: el aviso no trae dirección exacta, se muestra en su distrito.</div>' : "";
-  const enlace = i.url && i.url.startsWith("http") ? `<p><a href="${esc(i.url.split("#")[0])}" target="_blank" rel="noopener">Ver el aviso original →</a></p>` : "";
+  const enlace = fuente(i, estado.capa === "negocios" ? mensajeNegocio(i) : null);
   if (estado.capa === "negocios") {
     const d = i.detalle || {}, tipo = { traspaso: "Traspaso de negocio", local: "Concesión de local", estado: "Proyecto del Estado" }[i.tipo];
     p.innerHTML = `<h2>${esc(i.nombre || tipo)}</h2><p class="sub">${esc([tipo, i.rubro, i.entidad, i.area_m2 ? Math.round(i.area_m2) + " m²" : ""].filter(Boolean).join(" · "))}<br>${esc([i.distrito, i.provincia, i.departamento].filter(Boolean).join(", "))}</p>

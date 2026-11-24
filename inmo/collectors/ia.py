@@ -13,7 +13,7 @@ url (enlace absoluto al aviso; si la página es un solo aviso usa la URL de la p
 tipo (departamento|casa|local|oficina|terreno|edificio), operacion (venta|alquiler),
 estado (terminado|en_planos|preventa|remate), precio (número), moneda (USD|PEN),
 mantenimiento (número mensual), area_m2, dormitorios, banos, estacionamientos,
-departamento, provincia, distrito, direccion, fecha_entrega (AAAA-MM-DD), constructora, descripcion (máx 300 caracteres).
+departamento, provincia, distrito, direccion, fecha_entrega (AAAA-MM-DD), constructora, telefono (WhatsApp o teléfono de contacto del aviso), descripcion (máx 300 caracteres).
 Si un proyecto tiene varias unidades con precio "desde", crea un elemento por tipología con su precio y área.
 
 CONTENIDO:

@@ -37,6 +37,9 @@ def normalizar(item, fuente_id, tc):
     fila = {c: item.get(c) for c in COLUMNAS}
     if all(isinstance(x, (int, float)) for x in coords):
         fila["_coords"] = coords
+    tel = base.telefonos(str(item.get("telefono") or ""))
+    if tel:
+        fila["_telefono"] = tel
     return fila
 
 
@@ -45,6 +48,7 @@ def guardar(db, items):
         return []
     unicos = list({i["url"]: i for i in items}.values())
     coords = {i["url"]: i.pop("_coords") for i in unicos if "_coords" in i}
+    tels = {i["url"]: i.pop("_telefono") for i in unicos if "_telefono" in i}
     try:
         filas = db.upsert("inmuebles", unicos, on_conflict="url", devolver=True)
     except httpx.HTTPStatusError as e:
@@ -62,6 +66,8 @@ def guardar(db, items):
         if f["url"] in coords:
             lat, lng = coords[f["url"]]
             db.update("inmuebles", {"lat": lat, "lng": lng, "ubicacion_precision": "exacta"}, id=f"eq.{f['id']}")
+        if f["url"] in tels:
+            db.update("inmuebles", {"telefono": tels[f["url"]]}, id=f"eq.{f['id']}")
     hoy = date.today().isoformat()
     db.upsert("precios_historial", [{"inmueble_id": f["id"], "fecha": hoy, "precio_usd": f["precio_usd"]} for f in filas if f.get("precio_usd")], on_conflict="inmueble_id,fecha")
     return filas

@@ -170,5 +170,15 @@ def limpiar(item, tc):
     return item
 
 
+def telefonos(texto):
+    t = texto or ""
+    for patron in (r"wa\.me/\+?(\d{9,13})", r"whatsapp\.com/send/?\?phone=\+?(\d{9,13})", r"\+?51[\s.-]?(9\d{2})[\s.-]?(\d{3})[\s.-]?(\d{3})", r"(?<!\d)(9\d{2})[\s.-]?(\d{3})[\s.-]?(\d{3})(?!\d)"):
+        m = re.search(patron, t)
+        if m:
+            numero = "".join(m.groups())
+            return numero if numero.startswith("51") else "51" + numero
+    return None
+
+
 def valido(item):
-    return bool(item.get("url") and item.get("precio_usd") and item["precio_usd"] > 100 and item.get("operacion"))
+    return bool(str(item.get("url") or "").startswith("http") and item.get("precio_usd") and item["precio_usd"] > 100 and item.get("operacion"))

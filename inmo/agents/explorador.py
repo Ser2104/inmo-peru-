@@ -35,14 +35,7 @@ RESPUESTA:
 {respuesta}"""
 
 
-def telefonos(texto):
-    t = texto or ""
-    for patron in (r"wa\.me/\+?(\d{9,13})", r"whatsapp\.com/send/?\?phone=\+?(\d{9,13})", r"\+?51[\s.-]?(9\d{2})[\s.-]?(\d{3})[\s.-]?(\d{3})", r"(?<!\d)(9\d{2})[\s.-]?(\d{3})[\s.-]?(\d{3})(?!\d)"):
-        m = re.search(patron, t)
-        if m:
-            numero = "".join(m.groups())
-            return numero if numero.startswith("51") else "51" + numero
-    return None
+telefonos = base.telefonos
 
 PROMPT_COMPLETAR = """Busca en internet la información de venta de este inmueble o proyecto en Perú y complétala.
 Nombre: {nombre}
@@ -139,6 +132,7 @@ def _a_inmuebles(items, pista, tc):
             x[c] = x.get(c) or pista.get(c)
         x["estado"] = x.get("estado") or pista.get("estado_obra")
         x["operacion"] = x.get("operacion") or "venta"
+        x["telefono"] = x.get("telefono") or pista.get("telefono")
         fila = runner.normalizar(x, "explorador", tc)
         if base.valido(fila):
             salida.append(fila)
@@ -158,7 +152,7 @@ def verificar(db, p, limite=None):
             try:
                 html = base.descargar(url, intentos=2)
                 telefono = telefono or telefonos(html)
-                filas = _a_inmuebles(ia.extraer(html, url), pista, tc)
+                filas = _a_inmuebles(ia.extraer(html, url), {**pista, "telefono": telefono}, tc)
             except Exception:
                 filas = []
         if not filas and pista.get("precio") and pista.get("url"):
@@ -189,7 +183,7 @@ def procesar_respuestas(db, p):
             datos = llm.pedir_json(PROMPT_RESPUESTA.format(respuesta=(pista.get("respuesta") or "")[:15000], **{k: pista.get(k) or "" for k in ("nombre", "distrito", "departamento")}))
         except RuntimeError:
             continue
-        base_url = pista.get("url") or f"whatsapp:{pista['clave']}"
+        base_url = next((u for u in (pista.get("url"), pista.get("mencionado_en")) if u and u.startswith("http")), None) or f"https://wa.me/{pista['telefono']}"
         items = [{**x, "url": f"{base_url}#wa-{n}"} for n, x in enumerate(datos if isinstance(datos, list) else [])]
         filas = _a_inmuebles(items, pista, p["tipo_cambio"])
         cambios = {"contacto_estado": "procesado", "actualizado": datetime.now(timezone.utc).isoformat()}

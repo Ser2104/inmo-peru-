@@ -5,7 +5,6 @@ from .. import config, llm, negocios, ubigeo
 from ..busqueda import texto_pagina
 from ..collectors import base
 from ..valoracion import norm
-from .explorador import telefonos
 from .ubicador import Ubicador
 
 TIPOS = {
@@ -55,7 +54,7 @@ def normalizar(x, tipo, departamento, tc):
     lugar = ubigeo.resolver(x.get("distrito"), x.get("provincia"), x.get("departamento") or departamento)
     fila.update({k: lugar.get(k) or x.get(k) for k in ("departamento", "provincia", "distrito") if lugar.get(k) or x.get(k)})
     fila["departamento"] = fila.get("departamento") or departamento
-    tel = telefonos(str(x.get("telefono") or ""))
+    tel = base.telefonos(str(x.get("telefono") or ""))
     if tel:
         fila["telefono"] = tel
     return fila
@@ -73,6 +72,8 @@ def guardar(db, items, tipo, departamento, tc):
         if not isinstance(x, dict) or not (x.get("nombre") or x.get("url")):
             continue
         fila = normalizar(x, tipo, departamento, tc)
+        if not any(str(fila.get(c) or "").startswith("http") for c in ("url", "mencionado_en")) and not fila.get("telefono"):
+            continue
         k = clave(tipo, fila)
         if k.endswith("|"):
             continue
@@ -109,7 +110,7 @@ def _completar(db, c, texto, p, extra=None):
     datos = llm.pedir_json(PROMPT_DETALLE.format(texto=texto[:15000], **{k: c.get(k) or "" for k in ("nombre", "tipo", "distrito", "departamento")}))
     fila = normalizar(datos if isinstance(datos, dict) else {}, c["tipo"], c.get("departamento"), p["tipo_cambio"])
     fila = {k: v for k, v in fila.items() if v is not None and c.get(k) is None and k != "nombre"}
-    tel = c.get("telefono") or telefonos(texto)
+    tel = c.get("telefono") or base.telefonos(texto)
     db.update("concesiones", {**fila, **({"telefono": tel} if tel else {}), **(extra or {})}, id=f"eq.{c['id']}")
 
 
