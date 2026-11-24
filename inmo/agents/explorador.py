@@ -22,8 +22,27 @@ PROMPT = """Busca en internet {que}.
 Prioriza lo publicado en los últimos 60 días y lo que NO aparece en grandes portales como Urbania o Adondevivir.
 Devuelve una lista JSON (máximo 20) de objetos con: nombre (del proyecto o inmueble), url (página del proyecto o aviso; si no hay, la del foro o noticia),
 mencionado_en (url donde lo encontraste), departamento, provincia, distrito, tipo (departamento|casa|local|oficina|terreno|edificio),
-estado_obra (terminado|en_planos|preventa|remate), constructora, precio (número o null), moneda (USD|PEN|null), area_m2, resumen (máx. 200 caracteres).
+estado_obra (terminado|en_planos|preventa|remate), constructora, precio (número o null), moneda (USD|PEN|null), area_m2,
+telefono (WhatsApp o teléfono de contacto de ventas, si aparece), resumen (máx. 200 caracteres).
 No inventes datos: usa null si no aparece."""
+
+PROMPT_RESPUESTA = """Esta es la respuesta de un vendedor o constructora peruana sobre el proyecto "{nombre}" en {distrito}, {departamento}.
+Extrae cada unidad o tipología en venta con: titulo, tipo (departamento|casa|local|oficina|terreno), estado (terminado|en_planos|preventa|remate),
+precio (número), moneda (USD|PEN), area_m2, dormitorios, banos, fecha_entrega (AAAA-MM-DD), mantenimiento (número mensual), descripcion (forma de pago y datos útiles, máx. 300 caracteres).
+Devuelve una lista JSON; si no hay precios, devuelve [].
+
+RESPUESTA:
+{respuesta}"""
+
+
+def telefonos(texto):
+    t = texto or ""
+    for patron in (r"wa\.me/\+?(\d{9,13})", r"whatsapp\.com/send/?\?phone=\+?(\d{9,13})", r"\+?51[\s.-]?(9\d{2})[\s.-]?(\d{3})[\s.-]?(\d{3})", r"(?<!\d)(9\d{2})[\s.-]?(\d{3})[\s.-]?(\d{3})(?!\d)"):
+        m = re.search(patron, t)
+        if m:
+            numero = "".join(m.groups())
+            return numero if numero.startswith("51") else "51" + numero
+    return None
 
 PROMPT_COMPLETAR = """Busca en internet la información de venta de este inmueble o proyecto en Perú y complétala.
 Nombre: {nombre}
@@ -82,6 +101,7 @@ def guardar_pistas(db, pistas, categoria, departamento):
             "clave": k, "categoria": categoria,
             **{c: (str(x[c])[:500] if x.get(c) is not None else None) for c in ("nombre", "url", "mencionado_en", "departamento", "provincia", "distrito", "tipo", "estado_obra", "constructora", "moneda", "resumen")},
             "precio": precio, "area_m2": base.numero(x.get("area_m2")),
+            "telefono": telefonos(str(x.get("telefono") or "")),
         }
     existentes = {f["clave"] for f in db.select_all("pistas", select="clave")}
     nuevas = [f for k, f in filas.items() if k not in existentes]
@@ -131,12 +151,14 @@ def verificar(db, p, limite=None):
     pendientes = db.select("pistas", select="*", estado="in.(nueva,incompleta)", intentos="lt.3", order="creado.desc", limit=str(limite))
     ok = 0
     for pista in pendientes:
-        filas = []
+        filas, telefono = [], pista.get("telefono")
         for url in [pista.get("url"), pista.get("mencionado_en")]:
             if filas or not url or not url.startswith("http"):
                 continue
             try:
-                filas = _a_inmuebles(ia.extraer(base.descargar(url, intentos=2), url), pista, tc)
+                html = base.descargar(url, intentos=2)
+                telefono = telefono or telefonos(html)
+                filas = _a_inmuebles(ia.extraer(html, url), pista, tc)
             except Exception:
                 filas = []
         if not filas and pista.get("precio") and pista.get("url"):
@@ -147,15 +169,36 @@ def verificar(db, p, limite=None):
                 filas = _a_inmuebles(llm.pedir_json(PROMPT_COMPLETAR.format(**{k: pista.get(k) or "" for k in ("nombre", "distrito", "provincia", "departamento", "constructora", "resumen")}), buscar=True), pista, tc)
             except Exception:
                 filas = []
-        cambios = {"intentos": pista["intentos"] + 1, "actualizado": datetime.now(timezone.utc).isoformat()}
+        cambios = {"intentos": pista["intentos"] + 1, "actualizado": datetime.now(timezone.utc).isoformat(), "telefono": telefono}
         if filas:
             guardadas = runner.guardar(db, filas)
             cambios.update(estado="verificada", inmueble_id=guardadas[0]["id"])
             ok += 1
         else:
-            cambios["estado"] = "descartada" if pista["intentos"] + 1 >= 3 else "incompleta"
+            cambios["estado"] = "descartada" if pista["intentos"] + 1 >= 3 and not telefono else "incompleta"
         db.update("pistas", cambios, id=f"eq.{pista['id']}")
     return {"revisadas": len(pendientes), "verificadas": ok}
+
+
+def procesar_respuestas(db, p):
+    if not llm.disponible():
+        return {"omitido": "sin IA"}
+    hechas = 0
+    for pista in db.select("pistas", select="*", contacto_estado="eq.respondido", limit="50"):
+        try:
+            datos = llm.pedir_json(PROMPT_RESPUESTA.format(respuesta=(pista.get("respuesta") or "")[:15000], **{k: pista.get(k) or "" for k in ("nombre", "distrito", "departamento")}))
+        except RuntimeError:
+            continue
+        base_url = pista.get("url") or f"whatsapp:{pista['clave']}"
+        items = [{**x, "url": f"{base_url}#wa-{n}"} for n, x in enumerate(datos if isinstance(datos, list) else [])]
+        filas = _a_inmuebles(items, pista, p["tipo_cambio"])
+        cambios = {"contacto_estado": "procesado", "actualizado": datetime.now(timezone.utc).isoformat()}
+        if filas:
+            guardadas = runner.guardar(db, filas)
+            cambios.update(estado="verificada", inmueble_id=guardadas[0]["id"])
+            hechas += 1
+        db.update("pistas", cambios, id=f"eq.{pista['id']}")
+    return {"respuestas_procesadas": hechas}
 
 
 def aprender_fuentes(db):
@@ -176,4 +219,4 @@ def aprender_fuentes(db):
 
 
 def ejecutar(db, p):
-    return {"explorar": explorar(db, p), "verificar": verificar(db, p), "aprender": aprender_fuentes(db)}
+    return {"explorar": explorar(db, p), "verificar": verificar(db, p), "respuestas": procesar_respuestas(db, p), "aprender": aprender_fuentes(db)}

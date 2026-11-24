@@ -157,7 +157,7 @@ function completo(a) {
 }
 
 function abrirPanel(id) {
-  if (innerWidth < 700) ["filtros", "lista", "detalle"].filter((x) => x !== id).forEach((x) => $(x).classList.remove("abierto"));
+  if (innerWidth < 700) ["filtros", "lista", "detalle", "contactar"].filter((x) => x !== id).forEach((x) => $(x).classList.remove("abierto"));
   $(id).classList.add("abierto");
 }
 
@@ -236,6 +236,31 @@ $("f-veredicto").querySelectorAll(".btn").forEach((b) => b.onclick = () => {
 $("f-dep").onchange = () => { $("f-dist").value = ""; opciones(); dibujar(); };
 ["f-dist", "f-estrategia", "f-tipo", "f-estado", "f-precio"].forEach((id) => $(id).onchange = dibujar);
 $("f-puntaje").oninput = () => { $("v-puntaje").textContent = $("f-puntaje").value; dibujar(); };
+
+const mensaje = (p) => `Hola, soy asistente de Sergio Yacolca, de YACU Grupo Inmobiliario. Nos interesa invertir en ${p.nombre || "su proyecto"}${p.distrito ? " en " + p.distrito : ""}. ¿Nos podrían enviar precios, metrajes, fecha de entrega, forma de pago y mantenimiento de las unidades disponibles? Gracias.`;
+
+async function pistas() {
+  if (DEMO) { $("pistas").innerHTML = '<p class="sub">No disponible en modo ejemplo.</p>'; return; }
+  const { data, error } = await sb.from("pistas").select("id,nombre,distrito,departamento,url,telefono,contacto_estado,contactado")
+    .not("telefono", "is", null).is("precio", null).in("contacto_estado", ["pendiente", "contactado"]).order("contacto_estado").limit(200);
+  if (error) { $("pistas").innerHTML = `<p class="sub">${esc(error.message)}</p>`; return; }
+  $("pistas").innerHTML = data.map((p) => `<div class="item" data-id="${p.id}"><b>${esc(p.nombre || "Proyecto")}</b><br>
+    <span class="sub">${esc([p.distrito, p.departamento].filter(Boolean).join(", "))}${p.contacto_estado === "contactado" ? " · escrito el " + new Date(p.contactado).toLocaleDateString("es-PE") : ""}</span><br>
+    <a class="btn" href="https://wa.me/${p.telefono}?text=${encodeURIComponent(mensaje(p))}" target="_blank" rel="noopener" data-wa>Escribir por WhatsApp</a>
+    ${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">web</a>` : ""}
+    <textarea placeholder="Pega aquí la respuesta"></textarea><button class="btn" data-guardar>Guardar respuesta</button></div>`).join("") || '<p class="sub">No hay proyectos pendientes de contactar.</p>';
+  $("pistas").querySelectorAll(".item").forEach((el) => {
+    const id = el.dataset.id;
+    el.querySelector("[data-wa]").onclick = () => sb.from("pistas").update({ contacto_estado: "contactado", contactado: new Date().toISOString() }).eq("id", id).then(() => {});
+    el.querySelector("[data-guardar]").onclick = async () => {
+      const respuesta = el.querySelector("textarea").value.trim();
+      if (!respuesta) return;
+      const { error } = await sb.from("pistas").update({ respuesta, contacto_estado: "respondido" }).eq("id", id);
+      el.innerHTML = error ? `<p class="sub">${esc(error.message)}</p>` : '<p class="sub">✅ Guardado. Aparecerá en el mapa tras el próximo análisis.</p>';
+    };
+  });
+}
+$("b-contactar").onclick = () => $("contactar").classList.contains("abierto") ? $("contactar").classList.remove("abierto") : (abrirPanel("contactar"), pistas());
 
 async function entrar(crear) {
   const email = $("correo").value, password = $("clave").value;

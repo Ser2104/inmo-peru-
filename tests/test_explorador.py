@@ -68,3 +68,35 @@ def test_aprende_fuentes_nuevas():
 def test_enlaces_pdf():
     html = '<a href="/docs/catalogo.pdf">Lima</a><a href="/x.html">x</a><a href="/docs/catalogo.pdf">dup</a>'
     assert ia.enlaces_pdf(html, "https://www.bbva.pe/irbsa.html") == ["https://www.bbva.pe/docs/catalogo.pdf"]
+
+
+def test_telefonos():
+    assert explorador.telefonos('<a href="https://wa.me/51987654321">') == "51987654321"
+    assert explorador.telefonos("Ventas: 987 654 321") == "51987654321"
+    assert explorador.telefonos("+51 987-654-321") == "51987654321"
+    assert explorador.telefonos("RUC 20123456789") is None
+
+
+def test_pista_con_telefono_no_se_descarta(monkeypatch):
+    db = FakeDB()
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "")
+    monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "")
+    monkeypatch.setattr(config, "OPENAI_API_KEY", "")
+    explorador.guardar_pistas(db, [{"nombre": "Edificio Sol", "url": "https://sol.pe"}], "constructoras_pequenas", "Arequipa")
+    monkeypatch.setattr(base, "descargar", lambda url, **k: "Escríbenos al WhatsApp 987 654 321")
+    monkeypatch.setattr(ia, "extraer", lambda html, url: [])
+    for _ in range(3):
+        explorador.verificar(db, {**db.parametros(), "tipo_cambio": 3.45})
+    assert db.t["pistas"][0]["estado"] == "incompleta" and db.t["pistas"][0]["telefono"] == "51987654321"
+
+
+def test_procesar_respuesta_whatsapp(monkeypatch):
+    db = FakeDB()
+    explorador.guardar_pistas(db, [{"nombre": "Edificio Sol", "url": "https://sol.pe", "distrito": "Cayma"}], "constructoras_pequenas", "Arequipa")
+    db.t["pistas"][0].update(contacto_estado="respondido", respuesta="Depas de 2 dorm, 70 m2, desde S/ 320,000, entrega 2027")
+    monkeypatch.setattr(llm, "disponible", lambda: True)
+    monkeypatch.setattr(llm, "pedir_json", lambda prompt, **k: [{"titulo": "Depa 2 dorm", "precio": 320000, "moneda": "PEN", "area_m2": 70, "tipo": "departamento"}])
+    assert explorador.procesar_respuestas(db, {**db.parametros(), "tipo_cambio": 3.45})["respuestas_procesadas"] == 1
+    inm = db.t["inmuebles"][0]
+    assert inm["distrito"] == "Cayma" and inm["departamento"] == "Arequipa" and inm["precio_usd"] > 90000
+    assert db.t["pistas"][0]["contacto_estado"] == "procesado"

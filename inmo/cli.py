@@ -91,6 +91,7 @@ def main():
         paso(db, "rastreador", lambda: rastreador.ejecutar(db, p))
     if a.tarea in ("ciclo", "verificar"):
         paso(db, "verificador", lambda: explorador.verificar(db, p))
+        paso(db, "respuestas", lambda: explorador.procesar_respuestas(db, p))
     if a.tarea in ("mejorar", "completo"):
         paso(db, "mejora", lambda: mejora.ejecutar(db, p))
     if a.tarea == "completo":

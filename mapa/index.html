@@ -28,6 +28,7 @@ select,input[type=number],input[type=email],input[type=password]{width:100%;padd
 .cerrar{float:right;border:none;background:none;font-size:22px;cursor:pointer;color:var(--gris)}
 h2{font-size:18px;margin:0 0 4px}h3{font-size:15px;margin:18px 0 6px}
 .sub{color:var(--gris);font-size:13px;margin:0 0 12px}
+#pistas textarea{width:100%;min-height:70px;margin:6px 0;font:inherit}
 .veredicto{display:inline-block;color:#fff;border-radius:8px;padding:5px 12px;font-weight:600;font-size:14px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
 .dato{background:var(--suave);border-radius:10px;padding:9px}.dato small{display:block;color:var(--gris);font-size:12px}.dato b{font-size:16px}
@@ -67,6 +68,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;borde
   <button class="btn activo" id="b-inversion">Comprar</button>
   <button class="btn" id="b-arbitraje">Alquilar y operar por días</button>
   <button class="btn" id="b-zonas">🗺️ Zonas</button>
+  <button class="btn" id="b-contactar">📞 Contactar</button>
   <span class="chip" id="contador">…</span>
 </div>
 <div class="leyenda" id="leyenda"></div>
@@ -98,6 +100,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;borde
 </div>
 
 <div class="panel" id="lista"><button class="cerrar" data-cierra="lista">×</button><h2>Las mejores oportunidades</h2><p class="sub">Según los filtros y el plazo elegido</p><div id="items"></div></div>
+<div class="panel" id="contactar"><button class="cerrar" data-cierra="contactar">×</button><h2>Proyectos sin precio</h2><p class="sub">Escríbeles por WhatsApp, pega aquí su respuesta y la IA la analiza en el siguiente ciclo.</p><div id="pistas"></div></div>
 <div class="panel" id="detalle"><button class="cerrar" data-cierra="detalle">×</button><div id="contenido"></div></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
