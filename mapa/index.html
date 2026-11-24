@@ -67,6 +67,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;borde
   <button class="btn" id="b-lista">🏆 Mejores</button>
   <button class="btn activo" id="b-inversion">Comprar</button>
   <button class="btn" id="b-arbitraje">Alquilar y operar por días</button>
+  <button class="btn" id="b-negocios">🏪 Negocios y concesiones</button>
   <button class="btn" id="b-zonas">🗺️ Zonas</button>
   <button class="btn" id="b-contactar">📞 Contactar</button>
   <span class="chip" id="contador">…</span>
@@ -77,6 +78,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;borde
 <div class="panel" id="filtros">
   <button class="cerrar" data-cierra="filtros">×</button>
   <h2>Filtros</h2>
+  <label>Tipo de negocio (capa 🏪)</label><select id="f-negocio"><option value="">Todos</option><option value="traspaso">Traspasos</option><option value="local">Concesión de locales</option><option value="estado">Proyectos del Estado</option></select>
   <label>Departamento</label><select id="f-dep"><option value="">Todo el Perú</option></select>
   <label>Distrito</label><select id="f-dist"><option value="">Todos</option></select>
   <label>¿Qué plazo te importa?</label>
@@ -100,7 +102,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;borde
 </div>
 
 <div class="panel" id="lista"><button class="cerrar" data-cierra="lista">×</button><h2>Las mejores oportunidades</h2><p class="sub">Según los filtros y el plazo elegido</p><div id="items"></div></div>
-<div class="panel" id="contactar"><button class="cerrar" data-cierra="contactar">×</button><h2>Proyectos sin precio</h2><p class="sub">Escríbeles por WhatsApp, pega aquí su respuesta y la IA la analiza en el siguiente ciclo.</p><div id="pistas"></div></div>
+<div class="panel" id="contactar"><button class="cerrar" data-cierra="contactar">×</button><h2>Por contactar</h2><p class="sub">Proyectos y negocios a los que les falta información. Escríbeles por WhatsApp, pega aquí su respuesta y la IA la analiza en el siguiente ciclo.</p><div id="pistas"></div></div>
 <div class="panel" id="detalle"><button class="cerrar" data-cierra="detalle">×</button><div id="contenido"></div></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

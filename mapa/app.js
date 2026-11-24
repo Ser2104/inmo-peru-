@@ -6,7 +6,7 @@ const COLOR = { verde: "#1a7f37", ambar: "#c78a00", rojo: "#c62828", gris: "#6b7
 const DEMO = new URLSearchParams(location.search).has("demo");
 
 const estado = { capa: "inversion", horizonte: "total", veredictos: new Set(["Comprar", "Negociar", "Revisar a mano"]), zonas: false };
-let inmuebles = [], arbitrajes = [], sb = null;
+let inmuebles = [], arbitrajes = [], negocios = [], sb = null;
 
 const PERU = L.latLngBounds([-18.6, -81.6], [0.2, -68.4]);
 const mapa = L.map("mapa", { zoomControl: false, maxBounds: PERU.pad(0.15), maxBoundsViscosity: 1, minZoom: 5 }).fitBounds(PERU);
@@ -31,7 +31,7 @@ const capaZonas = L.layerGroup();
 mapa.addLayer(grupo);
 
 function puntaje(i) {
-  if (estado.capa === "arbitraje") return i.puntaje;
+  if (estado.capa !== "inversion") return i.puntaje;
   return estado.horizonte === "total" ? i.puntaje_total : i["puntaje_" + estado.horizonte];
 }
 
@@ -40,18 +40,22 @@ function color(p) {
   return p >= 7.5 ? COLOR.verde : p >= 6 ? COLOR.ambar : COLOR.rojo;
 }
 
-const COLOR_VEREDICTO = { "Comprar": COLOR.verde, "Buena oportunidad": COLOR.verde, "Negociar": COLOR.ambar, "Evaluar": COLOR.ambar, "Revisar a mano": COLOR.ambar };
+const COLOR_VEREDICTO = { "Atractivo": COLOR.verde, "Falta información": COLOR.gris, "Fuera de escala": COLOR.gris, "Comprar": COLOR.verde, "Buena oportunidad": COLOR.verde, "Negociar": COLOR.ambar, "Evaluar": COLOR.ambar, "Revisar a mano": COLOR.ambar };
 const nivelDe = (i) => [COLOR.rojo, COLOR.ambar, COLOR.verde].indexOf(colorDe(i));
-const colorDe = (i) => estado.horizonte === "total" || estado.capa === "arbitraje" ? (COLOR_VEREDICTO[i.veredicto] ?? COLOR.rojo) : color(puntaje(i));
+const colorDe = (i) => estado.horizonte === "total" || estado.capa !== "inversion" ? (COLOR_VEREDICTO[i.veredicto] ?? COLOR.rojo) : color(puntaje(i));
 
 function icono(i) {
-  const letra = estado.capa === "arbitraje" ? "A" : i.estado === "remate" ? "R" : i.estrategia === "temporal" ? "D" : i.estado === "preventa" || i.estado === "en_planos" ? "P" : "";
+  const letra = estado.capa === "negocios" ? { traspaso: "T", local: "C", estado: "E" }[i.tipo] : estado.capa === "arbitraje" ? "A" : i.estado === "remate" ? "R" : i.estrategia === "temporal" ? "D" : i.estado === "preventa" || i.estado === "en_planos" ? "P" : "";
   return L.divIcon({ className: "", html: `<div class="punto" style="background:${colorDe(i)}">${letra}</div>`, iconSize: [18, 18] });
 }
 
 function filtrados() {
   const dep = $("f-dep").value, dist = $("f-dist").value, min = +$("f-puntaje").value;
   const precio = +$("f-precio").value || Infinity;
+  if (estado.capa === "negocios") {
+    const t = $("f-negocio").value;
+    return negocios.filter((i) => (!dep || i.departamento === dep) && (!dist || i.distrito === dist) && (!t || i.tipo === t) && (i.puntaje ?? 0) >= min && (i.inversion_usd ?? 0) <= precio);
+  }
   if (estado.capa === "arbitraje") {
     return arbitrajes.filter((i) => (!dep || i.departamento === dep) && (!dist || i.distrito === dist) && (i.puntaje ?? 0) >= min);
   }
@@ -66,10 +70,12 @@ function dibujar() {
   const lista = filtrados();
   grupo.clearLayers();
   grupo.addLayers(lista.map((i) => L.marker([i.lat, i.lng], { icon: icono(i), nivel: Math.max(0, nivelDe(i)) }).on("click", () => abrir(i))));
-  $("contador").textContent = `${lista.length.toLocaleString("es-PE")} inmuebles`;
+  $("contador").textContent = `${lista.length.toLocaleString("es-PE")} ${estado.capa === "negocios" ? "negocios" : "inmuebles"}`;
   dibujarZonas(lista);
   dibujarLista(lista);
-  $("leyenda").innerHTML = estado.capa === "arbitraje"
+  $("leyenda").innerHTML = estado.capa === "negocios"
+    ? `<span style="background:${COLOR.verde}"></span>Atractivo<br><span style="background:${COLOR.ambar}"></span>Negociar / revisar<br><span style="background:${COLOR.rojo}"></span>Descartar<br><span style="background:${COLOR.gris}"></span>Falta información<br>T = traspaso · C = concesión · E = Estado`
+    : estado.capa === "arbitraje"
     ? `<span style="background:${COLOR.verde}"></span>Buena oportunidad<br><span style="background:${COLOR.ambar}"></span>Evaluar<br><span style="background:${COLOR.rojo}"></span>No conviene`
     : `<span style="background:${COLOR.verde}"></span>Comprar<br><span style="background:${COLOR.ambar}"></span>Negociar<br><span style="background:${COLOR.rojo}"></span>Descartar<br>D = mejor por días · R = remate · P = preventa`;
 }
@@ -93,8 +99,8 @@ function dibujarZonas(lista) {
 
 function dibujarLista(lista) {
   const top = [...lista].sort((a, b) => (puntaje(b) ?? 0) - (puntaje(a) ?? 0)).slice(0, 30);
-  $("items").innerHTML = top.map((i, n) => `<div class="item" data-n="${n}"><b style="color:${colorDe(i)}">${(puntaje(i) ?? 0).toFixed(1)}</b> · ${esc(i.titulo || i.tipo || "Inmueble")}<br>
-    <span class="sub">${esc(i.distrito || "")}, ${esc(i.departamento || "")} · ${estado.capa === "arbitraje" ? usd(i.utilidad_mensual_usd) + "/mes de ganancia" : usd(i.precio_usd)}</span></div>`).join("") || '<p class="sub">No hay inmuebles con estos filtros.</p>';
+  $("items").innerHTML = top.map((i, n) => `<div class="item" data-n="${n}"><b style="color:${colorDe(i)}">${(puntaje(i) ?? 0).toFixed(1)}</b> · ${esc(i.titulo || i.nombre || i.tipo || "Inmueble")}<br>
+    <span class="sub">${esc(i.distrito || "")}, ${esc(i.departamento || "")} · ${estado.capa === "negocios" ? esc(i.veredicto) + " · " + usd(i.inversion_usd) : estado.capa === "arbitraje" ? usd(i.utilidad_mensual_usd) + "/mes de ganancia" : usd(i.precio_usd)}</span></div>`).join("") || '<p class="sub">No hay inmuebles con estos filtros.</p>';
   $("items").querySelectorAll(".item").forEach((el) => el.onclick = () => { const i = top[+el.dataset.n]; mapa.setView([i.lat, i.lng], 16); abrir(i); });
 }
 
@@ -112,6 +118,24 @@ async function abrir(i) {
   const p = $("contenido");
   const aprox = i.ubicacion_precision === "distrito" ? '<div class="aviso">📍 Ubicación aproximada: el aviso no trae dirección exacta, se muestra en su distrito.</div>' : "";
   const enlace = i.url && i.url.startsWith("http") ? `<p><a href="${esc(i.url.split("#")[0])}" target="_blank" rel="noopener">Ver el aviso original →</a></p>` : "";
+  if (estado.capa === "negocios") {
+    const d = i.detalle || {}, tipo = { traspaso: "Traspaso de negocio", local: "Concesión de local", estado: "Proyecto del Estado" }[i.tipo];
+    p.innerHTML = `<h2>${esc(i.nombre || tipo)}</h2><p class="sub">${esc([tipo, i.rubro, i.entidad, i.area_m2 ? Math.round(i.area_m2) + " m²" : ""].filter(Boolean).join(" · "))}<br>${esc([i.distrito, i.provincia, i.departamento].filter(Boolean).join(", "))}</p>
+      <span class="veredicto" style="background:${COLOR_VEREDICTO[i.veredicto] ?? COLOR.rojo}">${esc(i.veredicto || "Sin analizar")}</span>
+      <div class="grid"><div class="dato"><small>${i.tipo === "estado" ? "Inversión del proyecto" : "Inversión inicial"}</small><b>${usd(i.inversion_usd)}</b></div>
+      <div class="dato"><small>Canon o alquiler</small><b>${i.canon_mensual_usd ? usd(i.canon_mensual_usd) + "/mes" : "—"}</b></div>
+      <div class="dato"><small>Ventas al mes</small><b>${usd(i.ventas_mensuales_usd)}</b></div>
+      <div class="dato"><small>Te quedaría al mes</small><b>${usd(i.utilidad_mensual_usd)}</b></div>
+      <div class="dato"><small>Ganancia anual</small><b>${pct(i.tir_anual)}</b></div>
+      <div class="dato"><small>Recuperas la inversión en</small><b>${i.payback_meses ? i.payback_meses + " meses" : "—"}</b></div>
+      <div class="dato"><small>Duración del contrato</small><b>${i.plazo_meses ? i.plazo_meses + " meses" : "—"}</b></div>
+      <div class="dato"><small>${i.tipo === "estado" ? "Etapa" : "Fecha límite"}</small><b>${esc(i.tipo === "estado" ? i.etapa || "—" : i.fecha_limite || "—")}</b></div></div>
+      ${d.van_pesimista_usd != null ? `<p class="sub">Si vendes 20% menos: ganancia anual ${pct(d.tir_pesimista)}. Se exige al menos ${pct(d.tasa_exigida)} al año por el riesgo de un negocio.</p>` : ""}
+      <p>${esc(i.descripcion || "")}</p><h3>Ten en cuenta</h3><ul>${(i.riesgos || []).map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
+      <div class="aviso">📍 Ubicación aproximada (distrito).</div>${enlace}`;
+    abrirPanel("detalle");
+    return;
+  }
   if (estado.capa === "arbitraje") {
     p.innerHTML = encabezado(i, i.veredicto, COLOR_VEREDICTO[i.veredicto] ?? COLOR.rojo) + `
       <p class="sub" style="margin-top:10px">Idea: alquilas este departamento a largo plazo, lo amoblas y lo alquilas por días.</p>
@@ -162,7 +186,7 @@ function abrirPanel(id) {
 }
 
 function opciones() {
-  const datos = estado.capa === "arbitraje" ? arbitrajes : inmuebles;
+  const datos = { arbitraje: arbitrajes, negocios, inversion: inmuebles }[estado.capa];
   const dep = $("f-dep").value;
   const llenar = (sel, valores, primero) => {
     const actual = sel.value;
@@ -187,9 +211,9 @@ async function cargar() {
   try {
     if (DEMO) {
       const d = await (await fetch("demo.json")).json();
-      inmuebles = d.inmuebles; arbitrajes = d.arbitrajes;
+      inmuebles = d.inmuebles; arbitrajes = d.arbitrajes; negocios = d.negocios || [];
     } else {
-      [inmuebles, arbitrajes] = await Promise.all([todo("mapa_inmuebles"), todo("mapa_arbitraje")]);
+      [inmuebles, arbitrajes, negocios] = await Promise.all([todo("mapa_inmuebles"), todo("mapa_arbitraje"), todo("mapa_concesiones")]);
     }
   } catch (e) {
     $("cargando").textContent = "No se pudo cargar: " + e.message;
@@ -214,11 +238,11 @@ $("b-zonas").onclick = () => {
   estado.zonas ? capaZonas.addTo(mapa) : mapa.removeLayer(capaZonas);
   dibujar();
 };
-for (const [id, capa] of [["b-inversion", "inversion"], ["b-arbitraje", "arbitraje"]]) {
+const CAPAS = [["b-inversion", "inversion"], ["b-arbitraje", "arbitraje"], ["b-negocios", "negocios"]];
+for (const [id, capa] of CAPAS) {
   $(id).onclick = () => {
     estado.capa = capa;
-    $("b-inversion").classList.toggle("activo", capa === "inversion");
-    $("b-arbitraje").classList.toggle("activo", capa === "arbitraje");
+    CAPAS.forEach(([b, c]) => $(b).classList.toggle("activo", c === capa));
     opciones();
     dibujar();
   };
@@ -234,28 +258,35 @@ $("f-veredicto").querySelectorAll(".btn").forEach((b) => b.onclick = () => {
   dibujar();
 });
 $("f-dep").onchange = () => { $("f-dist").value = ""; opciones(); dibujar(); };
-["f-dist", "f-estrategia", "f-tipo", "f-estado", "f-precio"].forEach((id) => $(id).onchange = dibujar);
+["f-dist", "f-negocio", "f-estrategia", "f-tipo", "f-estado", "f-precio"].forEach((id) => $(id).onchange = dibujar);
 $("f-puntaje").oninput = () => { $("v-puntaje").textContent = $("f-puntaje").value; dibujar(); };
 
 const mensaje = (p) => `Hola, soy asistente de Sergio Yacolca, de YACU Grupo Inmobiliario. Nos interesa invertir en ${p.nombre || "su proyecto"}${p.distrito ? " en " + p.distrito : ""}. ¿Nos podrían enviar precios, metrajes, fecha de entrega, forma de pago y mantenimiento de las unidades disponibles? Gracias.`;
 
+const mensajeNegocio = (p) => `Hola, soy asistente de Sergio Yacolca, de YACU Grupo Inmobiliario. Nos interesa ${p.nombre || "su negocio"}${p.distrito ? " en " + p.distrito : ""}. ¿Nos podrían indicar la inversión o precio, el canon o alquiler mensual, las ventas promedio al mes y la duración del contrato? Gracias.`;
+
 async function pistas() {
   if (DEMO) { $("pistas").innerHTML = '<p class="sub">No disponible en modo ejemplo.</p>'; return; }
-  const { data, error } = await sb.from("pistas").select("id,nombre,distrito,departamento,url,telefono,contacto_estado,contactado")
-    .not("telefono", "is", null).is("precio", null).in("contacto_estado", ["pendiente", "contactado"]).order("contacto_estado").limit(200);
+  const campos = "id,nombre,distrito,departamento,url,telefono,contacto_estado,contactado";
+  const [r1, r2] = await Promise.all([
+    sb.from("pistas").select(campos).not("telefono", "is", null).is("precio", null).in("contacto_estado", ["pendiente", "contactado"]).limit(200),
+    sb.from("concesiones").select(campos).not("telefono", "is", null).eq("veredicto", "Falta información").in("contacto_estado", ["pendiente", "contactado"]).limit(200),
+  ]);
+  const error = r1.error || r2.error;
   if (error) { $("pistas").innerHTML = `<p class="sub">${esc(error.message)}</p>`; return; }
-  $("pistas").innerHTML = data.map((p) => `<div class="item" data-id="${p.id}"><b>${esc(p.nombre || "Proyecto")}</b><br>
+  const data = [...r1.data.map((p) => ({ ...p, tabla: "pistas" })), ...r2.data.map((p) => ({ ...p, tabla: "concesiones" }))].sort((a, b) => a.contacto_estado.localeCompare(b.contacto_estado));
+  $("pistas").innerHTML = data.map((p) => `<div class="item" data-id="${p.id}" data-tabla="${p.tabla}"><b>${p.tabla === "concesiones" ? "🏪 " : ""}${esc(p.nombre || "Proyecto")}</b><br>
     <span class="sub">${esc([p.distrito, p.departamento].filter(Boolean).join(", "))}${p.contacto_estado === "contactado" ? " · escrito el " + new Date(p.contactado).toLocaleDateString("es-PE") : ""}</span><br>
-    <a class="btn" href="https://wa.me/${p.telefono}?text=${encodeURIComponent(mensaje(p))}" target="_blank" rel="noopener" data-wa>Escribir por WhatsApp</a>
+    <a class="btn" href="https://wa.me/${p.telefono}?text=${encodeURIComponent(p.tabla === "concesiones" ? mensajeNegocio(p) : mensaje(p))}" target="_blank" rel="noopener" data-wa>Escribir por WhatsApp</a>
     ${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">web</a>` : ""}
     <textarea placeholder="Pega aquí la respuesta"></textarea><button class="btn" data-guardar>Guardar respuesta</button></div>`).join("") || '<p class="sub">No hay proyectos pendientes de contactar.</p>';
   $("pistas").querySelectorAll(".item").forEach((el) => {
-    const id = el.dataset.id;
-    el.querySelector("[data-wa]").onclick = () => sb.from("pistas").update({ contacto_estado: "contactado", contactado: new Date().toISOString() }).eq("id", id).then(() => {});
+    const id = el.dataset.id, tabla = el.dataset.tabla;
+    el.querySelector("[data-wa]").onclick = () => sb.from(tabla).update({ contacto_estado: "contactado", contactado: new Date().toISOString() }).eq("id", id).then(() => {});
     el.querySelector("[data-guardar]").onclick = async () => {
       const respuesta = el.querySelector("textarea").value.trim();
       if (!respuesta) return;
-      const { error } = await sb.from("pistas").update({ respuesta, contacto_estado: "respondido" }).eq("id", id);
+      const { error } = await sb.from(tabla).update({ respuesta, contacto_estado: "respondido" }).eq("id", id);
       el.innerHTML = error ? `<p class="sub">${esc(error.message)}</p>` : '<p class="sub">✅ Guardado. Aparecerá en el mapa tras el próximo análisis.</p>';
     };
   });

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tarea:
-        description: ciclo | completo | bcrp | buscar | explorar | verificar | temporal | rastrear | analizar | auditar | alertas | mejorar | vigilar | diagnostico
+        description: ciclo | completo | bcrp | buscar | explorar | verificar | concesiones | temporal | rastrear | analizar | auditar | alertas | mejorar | vigilar | diagnostico
         default: ciclo
 concurrency: agentes
 jobs:
@@ -45,7 +45,7 @@ jobs:
         id: t
         run: |
           case "${{ github.event.schedule }}" in
-            "30 7 * * *") echo "tareas=bcrp temporal buscar explorar explorar rastrear mejorar" >> $GITHUB_OUTPUT ;;
+            "30 7 * * *") echo "tareas=bcrp temporal buscar explorar explorar concesiones rastrear mejorar" >> $GITHUB_OUTPUT ;;
             "0 9 * * 0") echo "tareas=completo" >> $GITHUB_OUTPUT ;;
             "") echo "tareas=${{ inputs.tarea }}" >> $GITHUB_OUTPUT ;;
             *) echo "tareas=ciclo" >> $GITHUB_OUTPUT ;;
