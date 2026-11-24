@@ -51,3 +51,24 @@ def test_proyecto_usa_unidad_mas_chica_y_tipo_de_url():
     proyecto, terreno = navent.parsear(html, "https://urbania.pe/x")
     assert proyecto["area_m2"] == 41 and proyecto["dormitorios"] == 1
     assert terreno["tipo"] == "terreno" and terreno["area_m2"] == 500
+
+
+def test_fecha_entrega_texto():
+    from inmo.collectors.base import fecha
+    assert fecha("junio 2027") == "2027-06-01" and fecha("2027-06-30") == "2027-06-30" and fecha("Entrega inmediata") is None
+
+
+def test_guardar_salta_fila_rechazada():
+    import httpx
+    from inmo.collectors import runner
+    from tests.fake_db import FakeDB
+
+    class DBQuisquillosa(FakeDB):
+        def upsert(self, tabla, filas, **k):
+            if tabla == "inmuebles" and any(f.get("operacion") == "mala" for f in (filas if isinstance(filas, list) else [filas])):
+                raise httpx.HTTPStatusError("400", request=httpx.Request("POST", "http://x"), response=httpx.Response(400, text="check"))
+            return super().upsert(tabla, filas, **k)
+
+    db = DBQuisquillosa()
+    filas = runner.guardar(db, [{"url": "a", "operacion": "venta", "precio_usd": 1e5}, {"url": "b", "operacion": "mala"}])
+    assert [f["url"] for f in filas] == ["a"]

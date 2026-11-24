@@ -1,3 +1,4 @@
+import httpx
 from datetime import date, datetime, timedelta, timezone
 
 from .. import config
@@ -16,7 +17,9 @@ def normalizar(item, fuente_id, tc):
     coords = (item.get("lat"), item.get("lng"))
     pista = f"{item.get('url', '')} {item.get('titulo', '')} {item.get('descripcion', '')}"
     item["tipo"] = item.get("tipo") or base.tipo_desde(pista)
-    item["operacion"] = item.get("operacion") or base.operacion_desde(pista)
+    op = str(item.get("operacion") or "").lower()
+    item["operacion"] = op if op in ("venta", "alquiler") else base.operacion_desde(pista)
+    item["fecha_entrega"] = base.fecha(item.get("fecha_entrega"))
     item["estado"] = item.get("estado") if item.get("estado") in ("terminado", "en_planos", "preventa", "remate") else base.estado_desde(pista)
     texto = pista.lower()
     if item["estado"] == "terminado" and ("/proyecto" in texto or " desde " in f" {texto}") and "entrega inmediata" not in texto:
@@ -42,7 +45,19 @@ def guardar(db, items):
         return []
     unicos = list({i["url"]: i for i in items}.values())
     coords = {i["url"]: i.pop("_coords") for i in unicos if "_coords" in i}
-    filas = db.upsert("inmuebles", unicos, on_conflict="url", devolver=True)
+    try:
+        filas = db.upsert("inmuebles", unicos, on_conflict="url", devolver=True)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code != 400:
+            raise
+        filas = []
+        for fila in unicos:
+            try:
+                filas += db.upsert("inmuebles", [fila], on_conflict="url", devolver=True)
+            except httpx.HTTPStatusError as e2:
+                if e2.response.status_code != 400:
+                    raise
+                print("inmueble rechazado:", fila.get("url"), e2.response.text[:300])
     for f in filas:
         if f["url"] in coords:
             lat, lng = coords[f["url"]]

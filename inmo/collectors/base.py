@@ -1,6 +1,7 @@
 import random
 import re
 import time
+from datetime import datetime
 
 import httpx
 
@@ -131,6 +132,25 @@ def ubicacion(texto):
     if len(partes) == 2:
         return {"distrito": partes[0], "provincia": partes[1], "departamento": partes[1]}
     return {"distrito": partes[0]}
+
+
+MESES = {m: n for n, m in enumerate(["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre"], 1)}
+
+
+def fecha(texto):
+    t = str(texto or "").lower().replace("septiembre", "setiembre")
+    m = re.search(r"(20\d{2})-(\d{1,2})(?:-(\d{1,2}))?", t)
+    if m:
+        a, mes, d = int(m[1]), int(m[2]), int(m[3] or 1)
+    else:
+        anio = re.search(r"20\d{2}", t)
+        if not anio:
+            return None
+        a, mes, d = int(anio.group()), next((n for k, n in MESES.items() if k in t), 12 if re.search(r"fin|diciembre|2do|segundo", t) else 6), 1
+    try:
+        return datetime(a, mes, d).date().isoformat()
+    except ValueError:
+        return datetime(a, min(max(mes, 1), 12), 1).date().isoformat()
 
 
 def limpiar(item, tc):
