@@ -6,13 +6,14 @@ from .. import ubigeo
 
 COLUMNAS = [
     "fuente", "url", "titulo", "tipo", "operacion", "estado", "departamento", "provincia", "distrito", "direccion",
-    "lat", "lng", "area_m2", "dormitorios", "banos", "estacionamientos", "precio", "moneda", "precio_usd",
+    "area_m2", "dormitorios", "banos", "estacionamientos", "precio", "moneda", "precio_usd",
     "mantenimiento_usd", "fecha_entrega", "constructora", "descripcion", "activo", "ultima_vez",
 ]
 
 
 def normalizar(item, fuente_id, tc):
     item = base.limpiar(dict(item), tc)
+    coords = (item.get("lat"), item.get("lng"))
     pista = f"{item.get('url', '')} {item.get('titulo', '')} {item.get('descripcion', '')}"
     item["tipo"] = item.get("tipo") or base.tipo_desde(pista)
     item["operacion"] = item.get("operacion") or base.operacion_desde(pista)
@@ -30,14 +31,22 @@ def normalizar(item, fuente_id, tc):
     item["fuente"] = fuente_id
     item["activo"] = True
     item["ultima_vez"] = datetime.now(timezone.utc).isoformat()
-    return {c: item.get(c) for c in COLUMNAS}
+    fila = {c: item.get(c) for c in COLUMNAS}
+    if all(isinstance(x, (int, float)) for x in coords):
+        fila["_coords"] = coords
+    return fila
 
 
 def guardar(db, items):
     if not items:
         return []
     unicos = list({i["url"]: i for i in items}.values())
+    coords = {i["url"]: i.pop("_coords") for i in unicos if "_coords" in i}
     filas = db.upsert("inmuebles", unicos, on_conflict="url", devolver=True)
+    for f in filas:
+        if f["url"] in coords:
+            lat, lng = coords[f["url"]]
+            db.update("inmuebles", {"lat": lat, "lng": lng, "ubicacion_precision": "exacta"}, id=f"eq.{f['id']}")
     hoy = date.today().isoformat()
     db.upsert("precios_historial", [{"inmueble_id": f["id"], "fecha": hoy, "precio_usd": f["precio_usd"]} for f in filas if f.get("precio_usd")], on_conflict="inmueble_id,fecha")
     return filas

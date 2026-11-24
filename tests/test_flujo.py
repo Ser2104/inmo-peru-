@@ -50,3 +50,13 @@ def test_fuente_caida_suma_fallos(monkeypatch):
     monkeypatch.setattr(base, "descargar", falla)
     runner.recolectar_fuente(db, db.select("fuentes")[0], db.parametros())
     assert db.t["fuentes"][0]["fallos_seguidos"] == 3
+
+
+def test_releer_no_borra_ubicacion(monkeypatch):
+    db = FakeDB()
+    db.upsert("fuentes", {"id": "urbania", "nombre": "U", "tipo": "navent", "urls": ["https://urbania.pe/p-{n}.html"], "config": {}, "fallos_seguidos": 0})
+    monkeypatch.setattr(base, "descargar", lambda url, **k: HTML)
+    runner.recolectar_fuente(db, db.select("fuentes")[0], db.parametros())
+    db.t["inmuebles"][0].update(lat=-12.1, lng=-77.0, ubicacion_precision="distrito")
+    runner.recolectar_fuente(db, db.select("fuentes")[0], db.parametros(), completo=True)
+    assert db.t["inmuebles"][0]["lat"] == -12.1
