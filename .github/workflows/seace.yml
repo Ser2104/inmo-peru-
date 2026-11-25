@@ -19,6 +19,6 @@ jobs:
       - uses: actions/checkout@v4
       - run: python -m pip install -q -r requirements.txt
       - if: inputs.ver == 'si'
-        run: python herramientas/ver_seace.py
+        run: python -c "import runpy,sys; sys.path.insert(0,'.'); runpy.run_path('herramientas/ver_seace.py')"
       - if: inputs.ver != 'si'
         run: python -m inmo.cli oportunidades --fuentes seace
