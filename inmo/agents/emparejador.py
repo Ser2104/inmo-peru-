@@ -36,7 +36,7 @@ antiguedad_maxima (años, o null), con_conductor (true/false/null), plazo (durac
 monto_referencial (número en soles, o null), requisitos_clave (máx. 6 textos cortos),
 cumple (true/false: si con lo que tiene podría cumplir), por_que (máx. 160 caracteres),
 sin_experiencia (true si las bases NO exigen experiencia previa del postor —monto facturado, años o contratos anteriores— como requisito
-de calificación; false si la exigen; null si no lo dicen), experiencia (máx. 160 caracteres: qué experiencia piden exactamente, o "ninguna"),
+de calificación —busca "experiencia del postor", "requisitos de calificación", "facturación"—; false solo si la exigen; si en el texto no aparece ningún requisito de experiencia, true; null solo si el texto está cortado o no son las bases), experiencia (máx. 160 caracteres: qué experiencia piden exactamente, o "ninguna"),
 sin_empresa (true si las bases permiten postular como persona natural con RUC, false si exigen persona jurídica o una autorización
 que solo dan a empresas, null si no lo dicen), sin_empresa_por_que (máx. 160 caracteres),
 para_postular (lista de lo que debe tener o tramitar antes, con costo si lo sabes: RUC activo y habido, RNP de bienes/servicios,

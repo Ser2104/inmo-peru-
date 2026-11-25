@@ -60,7 +60,7 @@ function filtrados() {
   const precio = +$("f-precio").value || Infinity;
   if (estado.capa === "oportunidades") {
     const r = $("f-rubro").value;
-    return oportunidades.filter((i) => (!estado.paraMi || i.encaja) && (!estado.sinExp || i.requisitos?.sin_experiencia === true) && (!dep || i.departamento === dep) && (!dist || i.distrito === dist) && (!r || i.rubro === r) && (i.monto_usd ?? 0) <= precio);
+    return oportunidades.filter((i) => (!estado.paraMi || i.encaja) && (!estado.sinExp || i.requisitos?.sin_experiencia === true || (i.requisitos?.sin_experiencia == null && i.requisitos?.cumple != null)) && (!dep || i.departamento === dep) && (!dist || i.distrito === dist) && (!r || i.rubro === r) && (i.monto_usd ?? 0) <= precio);
   }
   if (estado.capa === "negocios") {
     const t = $("f-negocio").value;
@@ -357,7 +357,7 @@ function paraTi(i) {
   return `<h3>🎯 ¿Te sirve? ${i.encaja ? `<span style="color:${COLOR.verde}">Sí (${i.puntaje_perfil ?? "—"}/100)</span>` : `<span style="color:${COLOR.rojo}">No</span>`}</h3>
     <p class="sub">${esc(i.razon || "")}</p>${r.no_legible ? '<div class="aviso">📄 Las bases están escaneadas como imagen: la IA no pudo leerlas. Ábrelas con el botón de la fuente para ver experiencia, requisitos y fecha de oferta.</div>' : ""}${filas.length ? `<table>${filas.map(([k, v]) => `<tr><td>${k}</td><td>${esc(v)}</td></tr>`).join("")}</table>` : ""}
     ${(r.requisitos_clave || []).length ? `<p class="sub">Requisitos: ${r.requisitos_clave.map(esc).join(" · ")}</p>` : ""}
-    ${r.sin_experiencia == null ? "" : `<h3>¿Piden experiencia previa?</h3><p><b style="color:${r.sin_experiencia ? COLOR.verde : COLOR.rojo}">${r.sin_experiencia ? "No, puedes postular sin experiencia" : "Sí, piden experiencia"}</b><br><span class="sub">${esc(r.experiencia || "")}</span></p>`}
+    ${r.sin_experiencia == null ? (r.cumple != null ? '<h3>¿Piden experiencia previa?</h3><p><b>Las bases no lo mencionan</b><br><span class="sub">Probablemente no la piden; confírmalo en el PDF.</span></p>' : "") : `<h3>¿Piden experiencia previa?</h3><p><b style="color:${r.sin_experiencia ? COLOR.verde : COLOR.rojo}">${r.sin_experiencia ? "No, puedes postular sin experiencia" : "Sí, piden experiencia"}</b><br><span class="sub">${esc(r.experiencia || "")}</span></p>`}
     ${r.sin_empresa == null ? "" : `<h3>¿Puedes postular sin empresa?</h3><p><b style="color:${r.sin_empresa ? COLOR.verde : COLOR.rojo}">${r.sin_empresa ? "Sí, como persona natural con RUC" : "No, piden empresa o una autorización de empresa"}</b><br><span class="sub">${esc(r.sin_empresa_por_que || "")}</span></p>`}
     ${(r.para_postular || []).length ? `<h3>Lo que necesitas antes de postular</h3><ul>${r.para_postular.map((x) => `<li>${esc(typeof x === "string" ? x : Object.values(x).join(" — "))}</li>`).join("")}</ul>` : ""}
     ${(r.costos || []).length ? `<h3>Costos y ganancia ${r.costos_estimados ? "(estimados con precios típicos)" : "(con tus costos)"}</h3><table>${r.costos.map((c) => `<tr><td>${esc(c.concepto)}</td><td>S/ ${Math.round(+c.soles || 0).toLocaleString("es-PE")}</td></tr>`).join("")}
