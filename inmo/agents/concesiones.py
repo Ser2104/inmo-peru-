@@ -1,11 +1,11 @@
 import random
 from datetime import date, datetime, timezone
 
-from .. import config, llm, negocios, ubigeo
+from .. import config, entorno, llm, negocios, ubigeo
 from ..busqueda import texto_pagina
 from ..collectors import base
 from ..valoracion import norm
-from .ubicador import Ubicador
+from .ubicador import Ubicador, capital, km
 
 TIPOS = {
     "traspaso": "traspasos de negocios en marcha (restaurantes, cafeterías, bodegas, minimarkets, gimnasios, lavanderías, farmacias, hospedajes, salones) que se venden en {lugar}: avisos en OLX, Mercado Libre, Urbania, Adondevivir, Facebook Marketplace público, corredores y webs de traspasos",
@@ -135,21 +135,53 @@ def completar(db, p, limite=40):
     return {"completadas": hechas, "respuestas_procesadas": respuestas}
 
 
+def ubicar_preciso(ubicador, c):
+    lugar = ", ".join(x for x in (c.get("distrito"), c.get("provincia"), c.get("departamento")) if x)
+    centro = capital(c) or ubicador.centro(c)
+    for texto in (c.get("direccion"), c.get("entidad"), c.get("nombre") if c.get("tipo") == "local" else None):
+        if texto and lugar:
+            punto = ubicador.buscar(f"{texto}, {lugar}, Perú")
+            if punto and (not centro or km(punto, centro) <= 15):
+                return (*punto, "lugar")
+    return (*centro, "distrito") if centro else None
+
+
 def analizar(db, p):
-    ubicador = Ubicador(db)
+    ubicador, zona = Ubicador(db), entorno.Entorno(db)
     conteo = {}
     for c in db.select_all("concesiones", select="*"):
-        r = negocios.veredicto(c, p)
-        cambios = {k: r.get(k) for k in ("veredicto", "puntaje", "tir_anual", "van_usd", "payback_meses", "utilidad_mensual_usd", "riesgos")}
-        cambios["detalle"] = {k: r[k] for k in ("van_pesimista_usd", "tir_pesimista", "tasa_exigida", "margen_usado") if k in r}
-        if c.get("lat") is None:
-            punto = ubicador.ubicar(c)
+        cambios = {}
+        if c.get("ubicacion_precision") != "lugar":
+            punto = ubicar_preciso(ubicador, c)
             if punto:
-                cambios.update(lat=punto[0], lng=punto[1])
+                cambios.update(lat=punto[0], lng=punto[1], ubicacion_precision=punto[2])
+                c.update(cambios)
+        ubic = None
+        if c.get("ubicacion_precision") == "lugar" and c["tipo"] != "estado":
+            try:
+                ubic = entorno.resumen(zona.conteos(c["lat"], c["lng"]), c.get("rubro") or "otro")
+            except Exception:
+                ubic = None
+        r = negocios.veredicto(c, p, ubic)
+        cambios.update({k: r.get(k) for k in ("veredicto", "puntaje", "tir_anual", "van_usd", "payback_meses", "utilidad_mensual_usd", "riesgos")})
+        cambios.update(detalle={k: r[k] for k in ("van_pesimista_usd", "tir_pesimista", "tasa_exigida", "margen_usado", "puntaje_financiero") if k in r},
+                       entorno=ubic, puntaje_ubicacion=ubic and ubic["puntaje"])
         db.update("concesiones", cambios, id=f"eq.{c['id']}")
         conteo[r["veredicto"]] = conteo.get(r["veredicto"], 0) + 1
-    return conteo
+    return {**conteo, "consultas_entorno": zona.nuevas}
+
+
+def locales_estrategicos(db, limite=400):
+    zona, hechos = entorno.Entorno(db), 0
+    for i in db.select("inmuebles", select="id,lat,lng", activo="eq.true", tipo="eq.local", entorno="is.null",
+                       ubicacion_precision="in.(exacta,direccion)", limit=str(limite)):
+        try:
+            db.update("inmuebles", {"entorno": entorno.resumen(zona.conteos(i["lat"], i["lng"]), "otro")}, id=f"eq.{i['id']}")
+            hechos += 1
+        except Exception:
+            continue
+    return {"locales_evaluados": hechos}
 
 
 def ejecutar(db, p):
-    return {"buscar": buscar(db, p), "completar": completar(db, p), "analizar": analizar(db, p)}
+    return {"buscar": buscar(db, p), "completar": completar(db, p), "analizar": analizar(db, p), "locales": locales_estrategicos(db)}

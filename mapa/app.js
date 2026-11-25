@@ -124,6 +124,15 @@ function fuente(i, mensajeWa) {
   return `<h3>Fuente y contacto</h3><p class="sub">${quien ? quien + "<br>" : ""}Datos tomados de ${esc(links.map(dominio).join(" y ") || "WhatsApp")}. Confirma precio y disponibilidad directamente.</p><div class="fila">${partes.join(" ") || '<span class="sub">Sin enlace: usa 📞 Contactar.</span>'}</div>`;
 }
 
+const RUBRO = { cafeteria: "Cafetería", restaurante: "Restaurante", comida_rapida: "Comida rápida", bodega: "Bodega", minimarket: "Minimarket", farmacia: "Farmacia", libreria: "Librería", fotocopiadora: "Fotocopiadora", gimnasio: "Gimnasio", lavanderia: "Lavandería", estacionamiento: "Estacionamiento", quiosco: "Quiosco", hospedaje: "Hospedaje", salon_belleza: "Salón de belleza", otro: "Otro" };
+
+function zona(e, titulo) {
+  if (!e) return "";
+  return `<h3>${titulo}</h3><p class="sub">A ${e.radio_m} m: ${esc(e.cerca.join(", ") || "poca actividad")}${e.rubro !== "otro" ? ` · ${e.competidores} competidores directos` : ""}.</p>
+    ${e.rubro !== "otro" ? barra("Ubicación para " + (RUBRO[e.rubro] || e.rubro).toLowerCase(), e.puntaje) : ""}
+    <p class="sub">Mejores negocios para este punto: ${e.mejores_rubros.map(([r, p]) => `<b>${esc(RUBRO[r] || r)}</b> ${p}/10`).join(" · ")}</p>`;
+}
+
 async function abrir(i) {
   const p = $("contenido");
   const aprox = i.ubicacion_precision === "distrito" ? '<div class="aviso">📍 Ubicación aproximada: el aviso no trae dirección exacta, se muestra en su distrito.</div>' : "";
@@ -141,8 +150,9 @@ async function abrir(i) {
       <div class="dato"><small>Duración del contrato</small><b>${i.plazo_meses ? i.plazo_meses + " meses" : "—"}</b></div>
       <div class="dato"><small>${i.tipo === "estado" ? "Etapa" : "Fecha límite"}</small><b>${esc(i.tipo === "estado" ? i.etapa || "—" : i.fecha_limite || "—")}</b></div></div>
       ${d.van_pesimista_usd != null ? `<p class="sub">Si vendes 20% menos: ganancia anual ${pct(d.tir_pesimista)}. Se exige al menos ${pct(d.tasa_exigida)} al año por el riesgo de un negocio.</p>` : ""}
+      ${zona(i.entorno, "¿Es un punto estratégico?")}${i.ubicacion_precision === "lugar" ? "" : '<div class="aviso">📍 Ubicación aproximada: aún no se pudo evaluar la zona exacta.</div>'}
       <p>${esc(i.descripcion || "")}</p><h3>Ten en cuenta</h3><ul>${(i.riesgos || []).map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
-      <div class="aviso">📍 Ubicación aproximada (distrito).</div>${enlace}`;
+      ${enlace}`;
     abrirPanel("detalle");
     return;
   }
@@ -168,7 +178,7 @@ async function abrir(i) {
       <div class="dato"><small>Te quedaría al mes</small><b>${usd(dias ? i.flujo_mensual_temporal : i.flujo_mensual_usd)}</b></div>
       <div class="dato"><small>Ganancia anual (10 años)</small><b>${pct(dias ? i.tir_10_temporal : i.tir_10)}</b></div>
       <div class="dato"><small>Frente a su zona</small><b>${i.descuento_vs_zona == null ? "—" : Math.abs(i.descuento_vs_zona * 100).toFixed(0) + "% " + (i.descuento_vs_zona > 0 ? "más barato" : "más caro")}</b></div>
-    </div>${confirmacion(i)}${aprox}<div id="extra"><p class="sub" style="margin-top:14px">Cargando análisis completo…</p></div>${enlace}`;
+    </div>${confirmacion(i)}${aprox}${i.tipo === "local" ? zona(i.entorno, "¿Para qué negocio sirve este local?") : ""}<div id="extra"><p class="sub" style="margin-top:14px">Cargando análisis completo…</p></div>${enlace}`;
   abrirPanel("detalle");
   const a = DEMO ? i._analisis : (await sb.from("analisis").select("riesgos,detalle,renta_mensual_usd").eq("inmueble_id", i.id).single()).data;
   $("extra").innerHTML = a ? completo(a) : "";

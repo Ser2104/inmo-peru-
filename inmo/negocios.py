@@ -59,7 +59,7 @@ def evaluar(n: Negocio, p):
     }
 
 
-def veredicto(c, p):
+def veredicto(c, p, ubic=None):
     riesgos = []
     if c["tipo"] == "estado":
         inv = c.get("inversion_usd")
@@ -89,12 +89,21 @@ def veredicto(c, p):
         riesgos.append("El canon o alquiler supera el 15% de las ventas: es alto.")
     if r["van_pesimista_usd"] < 0:
         riesgos.append("Si las ventas caen 20%, pierdes dinero.")
+    financiero = round(max(0.0, min(10.0, t * 20)), 1)
+    if ubic is None:
+        riesgos.append("Ubicación aproximada: no se pudo evaluar si la zona es estratégica para este negocio.")
+    else:
+        detalle = ", ".join(ubic["cerca"]) or "poca actividad"
+        riesgos.append(f"Zona a {ubic['radio_m']} m: {detalle}; {ubic['competidores']} competidores directos. Ubicación {ubic['puntaje']}/10.")
+        if ubic["puntaje"] < 4:
+            riesgos.append("Zona poco estratégica para este rubro: poca demanda o mucha competencia.")
     if r["utilidad_mensual_usd"] <= 0:
         v = "Descartar"
-    elif t >= 0.30 and (r["payback_meses"] or 999) <= 30 and r["van_pesimista_usd"] > 0:
+    elif t >= 0.30 and (r["payback_meses"] or 999) <= 30 and r["van_pesimista_usd"] > 0 and ubic and ubic["puntaje"] >= 6:
         v = "Atractivo"
-    elif t >= 0.18 or (r["payback_meses"] or 999) <= 40:
+    elif (t >= 0.18 or (r["payback_meses"] or 999) <= 40) and not (ubic and ubic["puntaje"] < 4 and t < 0.30):
         v = "Negociar"
     else:
         v = "Descartar"
-    return {"veredicto": v, "puntaje": round(max(0.0, min(10.0, t * 20)), 1), "riesgos": riesgos, **r}
+    total = financiero if ubic is None else round(0.7 * financiero + 0.3 * ubic["puntaje"], 1)
+    return {"veredicto": v, "puntaje": total, "puntaje_financiero": financiero, "riesgos": riesgos, **r}

@@ -11,7 +11,7 @@ from .collectors import bcrp, runner
 from .agents import analista, auditor, buscador, alertas, mejora, vigilante, explorador, temporal, ubicador, rastreador, concesiones, confirmador
 
 
-class Tiempo(Exception):
+class Tiempo(BaseException):
     pass
 
 
@@ -27,7 +27,7 @@ def paso(db, nombre, funcion):
         db.registrar(nombre, True, r)
         print(nombre, json.dumps(r, default=str, ensure_ascii=False)[:2000])
         return r
-    except Exception as e:
+    except (Exception, Tiempo) as e:
         try:
             db.registrar(nombre, False, {"error": str(e), "traza": traceback.format_exc()[-1500:]})
         except Exception:
