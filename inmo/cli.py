@@ -51,10 +51,12 @@ def recolectar(db, p, completo):
 def main():
     ap = argparse.ArgumentParser(description="Analizador inmobiliario Perú")
     ap.add_argument("tarea", choices=["ciclo", "completo", "bcrp", "buscar", "analizar", "auditar", "alertas", "mejorar",
-                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear", "rapido", "concesiones", "confirmar", "reubicar", "barrer", "oportunidades", "emparejar", "nexo", "descubrir"])
+                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear", "rapido", "concesiones", "confirmar", "reubicar", "barrer", "oportunidades", "emparejar", "nexo", "descubrir", "acelerar"])
     ap.add_argument("--urls", nargs="*")
     ap.add_argument("--departamentos", nargs="*")
     ap.add_argument("--fuentes", nargs="*", default=[])
+    ap.add_argument("--parte", type=int, default=0)
+    ap.add_argument("--partes", type=int, default=1)
     a = ap.parse_args()
     db = DB()
     if a.tarea == "diagnostico":
@@ -63,6 +65,14 @@ def main():
         p = db.parametros()
         for f in db.select("fuentes", select="*", id=f"in.({','.join(a.fuentes)})"):
             paso(db, f"barrido:{f['id']}", lambda f=f: runner.recolectar_fuente(db, f, p, completo=True, reparar=mejora.reparar_selectores, sin_limite=True))
+        return
+    if a.tarea == "acelerar":
+        p = db.parametros()
+        k, n = a.parte, a.partes
+        paso(db, f"acelerar:descubrir:{k}", lambda: descubridor.descubrir(db, cantidad=60, parte=k, partes=n))
+        paso(db, f"acelerar:verificar:{k}", lambda: descubridor.verificar(db, limite=80, parte=k, partes=n))
+        paso(db, f"acelerar:rastrear:{k}", lambda: rastreador.ejecutar(db, p, por_sitio=40, max_sitios=40, parte=k, partes=n, con_portales=False))
+        paso(db, f"acelerar:nexo:{k}", lambda: rastreador.portal_completo(db, p, "nexoinmobiliario", rastreador.SITEMAPS_PORTALES["nexoinmobiliario"], limite=600, parte=k, partes=n))
         return
     if a.tarea == "nexo":
         paso(db, "nexo", lambda: rastreador.portal_completo(db, db.parametros(), "nexoinmobiliario", rastreador.SITEMAPS_PORTALES["nexoinmobiliario"], limite=3000))

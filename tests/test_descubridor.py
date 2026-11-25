@@ -5,7 +5,7 @@ from tests.fake_db import FakeDB
 
 def test_descubre_filtra_portales_y_verifica(monkeypatch):
     db = FakeDB()
-    monkeypatch.setattr(descubridor, "consultas", lambda db, n: [("Cusco", "Cusco", "departamentos en venta Cusco constructora")])
+    monkeypatch.setattr(descubridor, "consultas", lambda db, n, *a: [("Cusco", "Cusco", "departamentos en venta Cusco constructora")])
     monkeypatch.setattr(descubridor, "buscar_web", lambda q, n=10: [
         {"url": "https://www.ninadepartamentos.pe/proyectos", "titulo": "NINA departamentos en preventa", "resumen": "Departamentos de 1 y 2 dormitorios"},
         {"url": "https://urbania.pe/buscar/x", "titulo": "Departamentos", "resumen": "precio"},

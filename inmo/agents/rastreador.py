@@ -75,9 +75,14 @@ def sitios(db):
 SITEMAPS_PORTALES = {"nexoinmobiliario": "https://nexoinmobiliario.pe/sitemap-proyectos.xml"}
 
 
-def portal_completo(db, p, fuente, sitemap, limite=150):
+def mi_parte(texto, parte, partes):
+    import zlib
+    return partes <= 1 or zlib.crc32(texto.encode()) % partes == parte
+
+
+def portal_completo(db, p, fuente, sitemap, limite=150, parte=0, partes=1):
     vistos = {f["url"] for f in db.select_all("rastreo", select="url", dominio=f"eq.{dominio(sitemap)}")}
-    nuevas = [u for u in leer_sitemap(sitemap, limite=20000) if u not in vistos][:limite]
+    nuevas = [u for u in leer_sitemap(sitemap, limite=20000) if u not in vistos and mi_parte(u, parte, partes)][:limite]
     total = 0
     for url in nuevas:
         try:
@@ -98,13 +103,13 @@ def portal_completo(db, p, fuente, sitemap, limite=150):
     return {"paginas": len(nuevas), "inmuebles": total}
 
 
-def ejecutar(db, p, por_sitio=None, max_sitios=None):
+def ejecutar(db, p, por_sitio=None, max_sitios=None, parte=0, partes=1, con_portales=True):
     from .. import config
     por_sitio = por_sitio or (30 if config.OPENAI_API_KEY else 15)
     max_sitios = max_sitios or (60 if config.OPENAI_API_KEY else 25)
     vistos = {f["url"] for f in db.select_all("rastreo", select="url")}
     resumen = {"sitios": 0, "paginas_nuevas": 0, "inmuebles": 0}
-    for sitio in sitios(db)[:max_sitios]:
+    for sitio in [d for d in sitios(db) if mi_parte(d, parte, partes)][:max_sitios]:
         nuevas = [u for u in paginas_candidatas(sitio) if u not in vistos][:por_sitio]
         resumen["sitios"] += 1
         avisos_sitio = 0
@@ -123,7 +128,7 @@ def ejecutar(db, p, por_sitio=None, max_sitios=None):
         previo = (db.select("sitios", select="paginas,avisos", dominio=f"eq.{sitio}") or [None])[0]
         if previo and nuevas:
             db.update("sitios", {"paginas": previo["paginas"] + len(nuevas), "avisos": previo["avisos"] + avisos_sitio}, dominio=f"eq.{sitio}")
-    for fuente, sitemap in SITEMAPS_PORTALES.items():
+    for fuente, sitemap in (SITEMAPS_PORTALES.items() if con_portales else []):
         try:
             resumen[fuente] = portal_completo(db, p, fuente, sitemap)
         except Exception as e:

@@ -38,19 +38,21 @@ TEXTO:
 {texto}"""
 
 
-def consultas(db, cantidad):
+def consultas(db, cantidad, parte=0, partes=1):
+    from .rastreador import mi_parte
     hechas = {f["consulta"] for f in db.select_all("busquedas_hechas", select="consulta")}
     todas = [(dep, c, p.format(c=c)) for dep, cs in CIUDADES.items() for c in cs for p in PLANTILLAS]
+    todas = [x for x in todas if mi_parte(x[2], parte, partes)]
     pendientes = [x for x in todas if x[2] not in hechas]
     random.shuffle(pendientes)
     return pendientes[:cantidad] or random.sample(todas, min(cantidad, len(todas)))
 
 
-def descubrir(db, cantidad=None, pausa=2.0):
+def descubrir(db, cantidad=None, pausa=2.0, parte=0, partes=1):
     cantidad = cantidad or (120 if config.OPENAI_API_KEY else 40)
     conocidos = {f["dominio"] for f in db.select_all("sitios", select="dominio")}
     nuevos = 0
-    for dep, ciudad, consulta in consultas(db, cantidad):
+    for dep, ciudad, consulta in consultas(db, cantidad, parte, partes):
         resultados = buscar_web(consulta, n=10)
         filas = {}
         for r in resultados:
@@ -69,9 +71,10 @@ def descubrir(db, cantidad=None, pausa=2.0):
     return {"consultas": cantidad, "sitios_nuevos": nuevos}
 
 
-def verificar(db, limite=150):
+def verificar(db, limite=150, parte=0, partes=1):
+    from .rastreador import mi_parte
     hechos = {"inmobiliaria": 0, "descartado": 0}
-    for s in db.select("sitios", select="*", estado="eq.nuevo", limit=str(limite)):
+    for s in [x for x in db.select("sitios", select="*", estado="eq.nuevo", limit=str(limite * partes)) if mi_parte(x["dominio"], parte, partes)][:limite]:
         texto = texto_pagina(s["url"], 5000)
         ahora = datetime.now(timezone.utc).isoformat()
         if not texto:
