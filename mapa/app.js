@@ -271,7 +271,9 @@ async function cargar() {
       const d = await (await fetch("demo.json")).json();
       inmuebles = d.inmuebles; arbitrajes = d.arbitrajes; negocios = d.negocios || [];
     } else {
-      [inmuebles, arbitrajes, negocios, oportunidades] = await Promise.all([todo("mapa_inmuebles"), todo("mapa_arbitraje"), todo("mapa_concesiones"), todo("mapa_oportunidades")]);
+      const seguro = (v) => todo(v).catch(() => []);
+      [inmuebles, arbitrajes, negocios, oportunidades] = await Promise.all([todo("mapa_inmuebles"), seguro("mapa_arbitraje"), seguro("mapa_concesiones"), seguro("mapa_oportunidades")]);
+      if (oportunidades.length && oportunidades[0].encaja === undefined) estado.paraMi = false;
     }
   } catch (e) {
     $("cargando").textContent = "No se pudo cargar: " + e.message;
