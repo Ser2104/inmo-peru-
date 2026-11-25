@@ -174,7 +174,7 @@ async function abrir(i) {
     <div class="grid">
       <div class="dato"><small>Precio</small><b>${usd(i.precio_usd)}</b></div>
       <div class="dato"><small>Te conviene pagar hasta</small><b>${usd(i.precio_max_recomendado)}</b></div>
-      <div class="dato"><small>Mejor forma de alquilar</small><b>${dias ? "Por días 🏖️" : "Tradicional"}</b></div>
+      <div class="dato"><small>Mejor forma de alquilar</small><b>${dias ? "Airbnb 🏖️" : "Largo plazo 🏠"}</b></div>
       <div class="dato"><small>Te quedaría al mes</small><b>${usd(dias ? i.flujo_mensual_temporal : i.flujo_mensual_usd)}</b></div>
       <div class="dato"><small>Ganancia anual (10 años)</small><b>${pct(dias ? i.tir_10_temporal : i.tir_10)}</b></div>
       <div class="dato"><small>Frente a su zona</small><b>${i.descuento_vs_zona == null ? "—" : Math.abs(i.descuento_vs_zona * 100).toFixed(0) + "% " + (i.descuento_vs_zona > 0 ? "más barato" : "más caro")}</b></div>
@@ -200,7 +200,7 @@ function listaParecidos(titulo, lista, alquiler) {
 
 function completo(a) {
   const d = a.detalle || {}, c = d.comparacion || {}, e = d.escenarios || {};
-  const comp = c.temporal ? `<h3>Tradicional vs. por días</h3><table><tr><th></th><th>Tradicional</th><th>Por días</th></tr>
+  const comp = c.temporal ? `<h3>Largo plazo vs. Airbnb</h3><table><tr><th></th><th>Largo plazo</th><th>Airbnb</th></tr>
     <tr><td>Cobras al año</td><td>${usd(c.largo_plazo.ingreso_bruto_anual)}</td><td>${usd(c.temporal.ingreso_bruto_anual)}</td></tr>
     <tr><td>Te queda al mes</td><td>${usd(c.largo_plazo.flujo_mensual_usd)}</td><td>${usd(c.temporal.flujo_mensual_usd)}</td></tr>
     <tr><td>Ganancia anual (10 años)</td><td>${pct(c.largo_plazo.tir_10)}</td><td>${pct(c.temporal.tir_10)}</td></tr></table>
@@ -277,6 +277,7 @@ for (const [id, capa] of CAPAS) {
   $(id).onclick = () => {
     estado.capa = capa;
     CAPAS.forEach(([b, c]) => $(b).classList.toggle("activo", c === capa));
+    modos();
     opciones();
     dibujar();
   };
@@ -292,6 +293,16 @@ $("f-veredicto").querySelectorAll(".btn").forEach((b) => b.onclick = () => {
   dibujar();
 });
 $("f-dep").onchange = () => { $("f-dist").value = ""; opciones(); dibujar(); };
+function modos() {
+  $("modos").hidden = estado.capa !== "inversion";
+  $("modos").querySelectorAll(".btn").forEach((b) => b.classList.toggle("activo", b.dataset.modo === $("f-estrategia").value));
+}
+$("modos").querySelectorAll(".btn").forEach((b) => b.onclick = () => {
+  $("f-estrategia").value = $("f-estrategia").value === b.dataset.modo ? "" : b.dataset.modo;
+  modos();
+  dibujar();
+});
+$("f-estrategia").addEventListener("change", modos);
 ["f-dist", "f-negocio", "f-estrategia", "f-tipo", "f-estado", "f-precio"].forEach((id) => $(id).onchange = dibujar);
 $("f-puntaje").oninput = () => { $("v-puntaje").textContent = $("f-puntaje").value; dibujar(); };
 

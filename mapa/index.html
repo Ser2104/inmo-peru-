@@ -68,6 +68,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;borde
   <button class="btn activo" id="b-inversion">🏠 Comprar y alquilar</button>
   <button class="btn" id="b-arbitraje">🔑 Subalquilar por días</button>
   <button class="btn" id="b-negocios">🏪 Negocios y concesiones</button>
+  <span id="modos"><button class="btn" data-modo="temporal">🏖️ Airbnb rentable</button><button class="btn" data-modo="largo_plazo">🏠 Alquiler a largo plazo</button></span>
   <button class="btn" id="b-zonas">🗺️ Zonas</button>
   <button class="btn" id="b-contactar">📞 Contactar</button>
   <span class="chip" id="contador">…</span>
@@ -92,7 +93,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;borde
     <button class="btn activo" data-v="Revisar a mano">Revisar</button><button class="btn" data-v="Descartar">Descartar</button>
   </div>
   <label>Mejor forma de alquilar</label>
-  <select id="f-estrategia"><option value="">Cualquiera</option><option value="largo_plazo">Alquiler tradicional</option><option value="temporal">Por días (Airbnb)</option></select>
+  <select id="f-estrategia"><option value="">Cualquiera</option><option value="largo_plazo">Alquiler a largo plazo</option><option value="temporal">Airbnb rentable</option></select>
   <label>Tipo</label>
   <select id="f-tipo"><option value="">Todos</option><option>departamento</option><option>casa</option><option>local</option><option>oficina</option><option>terreno</option><option>edificio</option></select>
   <label>Situación</label>
