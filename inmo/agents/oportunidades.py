@@ -88,7 +88,7 @@ def desde_release(rel, tc):
         "lat": punto[0] if punto else None, "lng": punto[1] if punto else None,
         "monto_usd": round(monto / tc, 2) if monto and valor.get("currency") == "PEN" else monto,
         "fecha_publicacion": (tender.get("datePublished") or rel.get("date") or "")[:10] or None,
-        "fecha_limite": ((tender.get("tenderPeriod") or {}).get("endDate") or "")[:10] or None,
+        "fecha_limite": None,
         "url": docs[0] if docs else f"https://contratacionesabiertas.oece.gob.pe/proceso/{rel.get('ocid')}",
         "metodo": " · ".join(x for x in (tender.get("procurementMethodDetails"), codigo) if x),
     }
@@ -126,17 +126,13 @@ def releases(paquete):
 
 def abierta(rel, hoy):
     t = rel.get("tender") or {}
-    if t.get("procurementMethod") == "direct" or t.get("status") in ("complete", "cancelled", "unsuccessful", "withdrawn"):
+    if t.get("procurementMethod") == "direct" or rel.get("awards"):
         return False
-    if any(a.get("status") in ("active", "pending") for a in rel.get("awards") or []):
+    estados = {str(i.get("statusDetails") or "").upper() for i in t.get("items") or []}
+    if "CONVOCADO" not in estados:
         return False
-    if any(str(i.get("statusDetails") or "").upper() in ("ADJUDICADO", "DESIERTO", "CANCELADO", "NULO") for i in t.get("items") or []):
-        return False
-    fin = ((t.get("tenderPeriod") or {}).get("endDate") or "")[:10]
-    if fin:
-        return fin >= hoy
     publicada = (t.get("datePublished") or rel.get("date") or "")[:10]
-    return publicada >= (date.fromisoformat(hoy) - timedelta(days=10)).isoformat()
+    return publicada >= (date.fromisoformat(hoy) - timedelta(days=30)).isoformat()
 
 
 def seace(db, p, http=None):

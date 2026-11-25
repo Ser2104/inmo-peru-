@@ -10,7 +10,7 @@ def release(n, fecha=HOY, titulo="ALQUILER DE MAQUINARIA PESADA: EXCAVADORA Y VO
             "parties": [{"name": "MUNICIPALIDAD DISTRITAL DE CAYMA", "roles": ["buyer"], "address": {"region": "AREQUIPA", "locality": "CAYMA"},
                          "contactPoint": {"telephone": "054-123456", "email": "logistica@municayma.gob.pe"}}],
             "tender": {"title": titulo, "mainProcurementCategory": "services", "value": {"amount": 345000, "currency": "PEN"},
-                       "tenderPeriod": {"endDate": f"{HOY}T23:59:00-05:00"}}}
+                       "datePublished": f"{fecha}T10:00:00-05:00", "items": [{"statusDetails": "CONVOCADO"}]}}
 
 
 class Http:
@@ -39,7 +39,7 @@ def test_rubros():
 def test_seace_solo_guarda_convocatorias_abiertas():
     db = FakeDB()
     cerrada = release(3)
-    cerrada["tender"]["tenderPeriod"]["endDate"] = (date.today() - timedelta(days=5)).isoformat()
+    cerrada["tender"]["items"] = [{"statusDetails": "ADJUDICADO"}]
     paquete = {"records": [{"ocid": "a", "compiledRelease": release(1)}, {"ocid": "b", "compiledRelease": release(2, titulo="Adquisición de madera aserrada")},
                            {"ocid": "c", "compiledRelease": cerrada}]}
     r = oportunidades.seace(db, {"tipo_cambio": 3.45}, http=Http(zip_de(paquete)))

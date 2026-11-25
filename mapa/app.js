@@ -80,7 +80,7 @@ function dibujar() {
   dibujarZonas(lista);
   dibujarLista(lista);
   $("leyenda").innerHTML = estado.capa === "oportunidades"
-    ? `<span style="background:${COLOR.verde}"></span>Más de 7 días para postular<br><span style="background:${COLOR.ambar}"></span>2 a 7 días<br><span style="background:${COLOR.rojo}"></span>Vence ya<br><span style="background:${COLOR.gris}"></span>Sin fecha límite<br>E = Estado · P = empresa privada`
+    ? `<span style="background:${COLOR.verde}"></span>Más de 7 días para postular<br><span style="background:${COLOR.ambar}"></span>2 a 7 días<br><span style="background:${COLOR.rojo}"></span>Vence ya<br><span style="background:${COLOR.gris}"></span>Estado: revisa el cronograma en el SEACE<br>E = Estado · P = empresa privada`
     : estado.capa === "negocios"
     ? `<span style="background:${COLOR.verde}"></span>Atractivo<br><span style="background:${COLOR.ambar}"></span>Negociar / revisar<br><span style="background:${COLOR.rojo}"></span>Descartar<br><span style="background:${COLOR.gris}"></span>Falta información<br>T = traspaso · C = concesión · E = Estado`
     : estado.capa === "arbitraje"
@@ -149,13 +149,13 @@ async function abrir(i) {
   if (estado.capa === "oportunidades") {
     const d = dias(i.fecha_limite);
     p.innerHTML = `<h2>${esc(i.titulo)}</h2><p class="sub">${esc([i.rubro, i.categoria, i.metodo].filter(Boolean).join(" · "))}<br>${esc([i.distrito, i.provincia, i.departamento].filter(Boolean).join(", "))}</p>
-      <span class="veredicto" style="background:${colorOportunidad(i)}">${d == null ? "Sin fecha límite" : d < 0 ? "Vencida" : d === 0 ? "Vence hoy" : `Quedan ${d} días`}</span>
+      <span class="veredicto" style="background:${colorOportunidad(i)}">${d == null ? (i.fuente === "seace" ? "Convocado el " + (i.fecha_publicacion || "—") : "Sin fecha límite") : d < 0 ? "Vencida" : d === 0 ? "Vence hoy" : `Quedan ${d} días`}</span>
       <div class="grid"><div class="dato"><small>Quién lo pide</small><b>${esc(i.entidad || "—")}</b></div>
       <div class="dato"><small>Monto referencial</small><b>${usd(i.monto_usd)}</b></div>
       <div class="dato"><small>Publicado</small><b>${esc(i.fecha_publicacion || "—")}</b></div>
       <div class="dato"><small>Fecha límite</small><b>${esc(i.fecha_limite || "—")}</b></div></div>
       <p>${esc(i.descripcion || "")}</p>
-      ${i.fuente === "seace" ? '<p class="sub">Compra del Estado (SEACE): para postular necesitas estar inscrito en el Registro Nacional de Proveedores (RNP) y presentar tu oferta en el SEACE antes de la fecha límite.</p>' : '<p class="sub">Pedido de una empresa privada encontrado en internet: confirma con ellos que siga vigente.</p>'}
+      ${i.fuente === "seace" ? `<p class="sub">Compra del Estado en etapa de convocatoria. Para ver bases y cronograma, busca el código <b>${esc((i.metodo || "").split(" · ")[1] || "")}</b> en el <a href="https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml" target="_blank" rel="noopener">buscador del SEACE</a>. Para postular necesitas estar inscrito en el Registro Nacional de Proveedores (RNP).</p>` : '<p class="sub">Pedido de una empresa privada encontrado en internet: confirma con ellos que siga vigente.</p>'}
       ${i.correo ? `<p class="sub">Correo: <a href="mailto:${esc(i.correo)}">${esc(i.correo)}</a></p>` : ""}${i.web ? `<p class="sub">Web: <a href="${esc(i.web)}" target="_blank" rel="noopener">${esc(i.web)}</a></p>` : ""}
       <div class="aviso">📍 Ubicación aproximada: se muestra en la ciudad de quien lo pide.</div>${fuente({ url: i.url, telefono: /^51\d{9}$/.test(i.telefono || "") ? i.telefono : null, entidad: i.entidad }, "Hola, vi su convocatoria y me interesa ofrecer el servicio. ¿Sigue vigente?")}${i.telefono && !/^51\d{9}$/.test(i.telefono) ? `<p class="sub">Teléfono: ${esc(i.telefono)}</p>` : ""}`;
     abrirPanel("detalle");
