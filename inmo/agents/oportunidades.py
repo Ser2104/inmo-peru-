@@ -94,6 +94,7 @@ def desde_release(rel, tc):
         "monto_usd": round(monto / tc, 2) if monto and valor.get("currency") == "PEN" else monto,
         "fecha_publicacion": (tender.get("datePublished") or rel.get("date") or "")[:10] or None,
         "fecha_limite": None,
+        "fecha_consultas": ((tender.get("enquiryPeriod") or {}).get("endDate") or "")[:10] or None,
         "url": docs[0] if docs else f"https://contratacionesabiertas.oece.gob.pe/proceso/{rel.get('ocid')}",
         "metodo": " · ".join(x for x in (tender.get("procurementMethodDetails"), codigo) if x),
         "items": [{"descripcion": str(i.get("description") or (i.get("classification") or {}).get("description") or "")[:200],

@@ -41,7 +41,8 @@ function color(p) {
 }
 
 const dias = (f) => f ? Math.ceil((new Date(f + "T23:59:00") - new Date()) / 864e5) : null;
-const colorOportunidad = (i) => { const d = dias(i.fecha_limite); return d == null ? COLOR.gris : d > 7 ? COLOR.verde : d >= 2 ? COLOR.ambar : COLOR.rojo; };
+const fmt = (f) => f ? new Date(f + "T12:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "numeric", month: "short" }) : "—";
+const colorOportunidad = (i) => { const d = dias(i.fecha_limite || i.fecha_consultas); return d == null ? COLOR.gris : d > 7 ? COLOR.verde : d >= 2 ? COLOR.ambar : COLOR.rojo; };
 const PORTALES = /^(urbania|adondevivir|properati|nexoinmobiliario|infocasas|casas-trovit|casas-mitula|nuroa|doomos|ubicasa)/;
 const REMATES = /^(bbva|remaju|rematesya|rematestributarios|propiedadesenremate|precioderemate)/;
 const origen = (i) => REMATES.test(i.fuente || "") || i.estado === "remate" ? "remates" : PORTALES.test(i.fuente || "") ? "portales" : "independientes";
@@ -83,7 +84,7 @@ function dibujar() {
   dibujarZonas(lista);
   dibujarLista(lista);
   $("leyenda").innerHTML = estado.capa === "oportunidades"
-    ? `<span style="background:${COLOR.verde}"></span>Más de 7 días para postular<br><span style="background:${COLOR.ambar}"></span>2 a 7 días<br><span style="background:${COLOR.rojo}"></span>Vence ya<br><span style="background:${COLOR.gris}"></span>Estado: revisa el cronograma en el SEACE<br>E = Estado · I = Banco Mundial · P = empresa privada u otra fuente`
+    ? `<span style="background:${COLOR.verde}"></span>Más de 7 días<br><span style="background:${COLOR.ambar}"></span>2 a 7 días<br><span style="background:${COLOR.rojo}"></span>Vence ya<br><span style="background:${COLOR.gris}"></span>Sin fecha aún<br>E = Estado · I = Banco Mundial · P = empresa privada u otra fuente`
     : estado.capa === "negocios"
     ? `<span style="background:${COLOR.verde}"></span>Atractivo<br><span style="background:${COLOR.ambar}"></span>Negociar / revisar<br><span style="background:${COLOR.rojo}"></span>Descartar<br><span style="background:${COLOR.gris}"></span>Falta información<br>T = traspaso · C = concesión · E = Estado`
     : estado.capa === "arbitraje"
@@ -110,9 +111,10 @@ function dibujarZonas(lista) {
 
 function dibujarLista(lista) {
   const op = estado.capa === "oportunidades";
-  const top = [...lista].sort((a, b) => op ? ((b.puntaje_perfil ?? 0) - (a.puntaje_perfil ?? 0)) || ((b.monto_usd ?? 0) - (a.monto_usd ?? 0)) : (puntaje(b) ?? 0) - (puntaje(a) ?? 0)).slice(0, 30);
+  const cuando = (i) => i.fecha_limite || i.fecha_consultas || "9999";
+  const top = [...lista].sort((a, b) => op ? (estado.paraMi ? cuando(a).localeCompare(cuando(b)) : 0) || ((b.puntaje_perfil ?? 0) - (a.puntaje_perfil ?? 0)) || ((b.monto_usd ?? 0) - (a.monto_usd ?? 0)) : (puntaje(b) ?? 0) - (puntaje(a) ?? 0)).slice(0, 30);
   $("items").innerHTML = top.map((i, n) => `<div class="item" data-n="${n}"><b style="color:${colorDe(i)}">${op ? "💼" : (puntaje(i) ?? 0).toFixed(1)}</b> · ${esc((i.titulo || i.nombre || i.tipo || "Inmueble").slice(0, 120))}<br>
-    <span class="sub">${esc(i.distrito || "")}, ${esc(i.departamento || "")} · ${estado.capa === "oportunidades" ? esc(i.rubro) + " · " + (i.monto_usd ? usd(i.monto_usd) : "monto no indicado") + (i.fecha_limite ? " · vence " + i.fecha_limite : "") : estado.capa === "negocios" ? esc(i.veredicto) + " · " + usd(i.inversion_usd) : estado.capa === "arbitraje" ? usd(i.utilidad_mensual_usd) + "/mes de ganancia" : usd(i.precio_usd)}</span></div>`).join("") || '<p class="sub">No hay inmuebles con estos filtros.</p>';
+    <span class="sub">${esc(i.distrito || "")}, ${esc(i.departamento || "")} · ${estado.capa === "oportunidades" ? esc(i.rubro) + " · " + (i.monto_usd ? usd(i.monto_usd) : "monto no indicado") + (i.fecha_limite ? " · oferta hasta " + fmt(i.fecha_limite) : i.fecha_consultas ? " · consultas hasta " + fmt(i.fecha_consultas) : "") : estado.capa === "negocios" ? esc(i.veredicto) + " · " + usd(i.inversion_usd) : estado.capa === "arbitraje" ? usd(i.utilidad_mensual_usd) + "/mes de ganancia" : usd(i.precio_usd)}</span></div>`).join("") || '<p class="sub">No hay inmuebles con estos filtros.</p>';
   $("items").querySelectorAll(".item").forEach((el) => el.onclick = () => { const i = top[+el.dataset.n]; mapa.setView([i.lat, i.lng], 16); abrir(i); });
 }
 
@@ -152,11 +154,14 @@ async function abrir(i) {
   if (estado.capa === "oportunidades") {
     const d = dias(i.fecha_limite);
     p.innerHTML = `<h2>${esc(i.titulo)}</h2><p class="sub">${esc([i.rubro, i.categoria, i.metodo].filter(Boolean).join(" · "))}<br>${esc([i.distrito, i.provincia, i.departamento].filter(Boolean).join(", "))}</p>
-      <span class="veredicto" style="background:${colorOportunidad(i)}">${d == null ? (i.fuente === "seace" ? "Convocado el " + (i.fecha_publicacion || "—") : "Sin fecha límite") : d < 0 ? "Vencida" : d === 0 ? "Vence hoy" : `Quedan ${d} días`}</span>
+      <span class="veredicto" style="background:${colorOportunidad(i)}">${d == null ? (i.fecha_consultas ? "Consultas hasta " + fmt(i.fecha_consultas) : i.fuente === "seace" ? "Convocado el " + fmt(i.fecha_publicacion) : "Sin fecha límite") : d < 0 ? "Vencida" : d === 0 ? "Vence hoy" : `Quedan ${d} días`}</span>
       <div class="grid"><div class="dato"><small>Quién lo pide</small><b>${esc(i.entidad || "—")}</b></div>
-      <div class="dato"><small>Monto referencial</small><b>${usd(i.monto_usd)}</b></div>
-      <div class="dato"><small>Publicado</small><b>${esc(i.fecha_publicacion || "—")}</b></div>
-      <div class="dato"><small>Fecha límite</small><b>${esc(i.fecha_limite || "—")}</b></div></div>
+      <div class="dato"><small>Monto referencial</small><b>${usd(i.monto_usd || (i.requisitos?.monto_referencial ? i.requisitos.monto_referencial / 3.45 : null))}</b></div></div>
+      <h3>Fechas</h3><table>
+        <tr><td>Publicada</td><td>${fmt(i.fecha_publicacion)}</td></tr>
+        <tr><td>Consultas hasta</td><td>${fmt(i.fecha_consultas)}${i.fecha_consultas ? ` (${dias(i.fecha_consultas) < 0 ? "ya cerró" : "quedan " + dias(i.fecha_consultas) + " días"})` : ""}</td></tr>
+        <tr><td><b>Presentar oferta hasta</b></td><td><b>${i.fecha_limite ? `${fmt(i.fecha_limite)} (${dias(i.fecha_limite) < 0 ? "vencida" : "quedan " + dias(i.fecha_limite) + " días"})` : "se confirma al leer las bases"}</b></td></tr>
+      </table>
       ${paraTi(i)}${itemsTabla(i)}<p>${esc(i.descripcion || "")}</p>
       ${i.fuente === "seace" ? `<p class="sub">Compra del Estado en etapa de convocatoria. Para ver bases y cronograma, busca el código <b>${esc((i.metodo || "").split(" · ")[1] || "")}</b> en el <a href="https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml" target="_blank" rel="noopener">buscador del SEACE</a>. Para postular necesitas estar inscrito en el Registro Nacional de Proveedores (RNP).</p>` : '<p class="sub">' + (i.fuente === "banco_mundial" ? "Licitación financiada por el Banco Mundial: revisa requisitos y documentos en el enlace." : "Pedido encontrado en internet: confirma con ellos que siga vigente.") + '</p>'}
       ${i.correo ? `<p class="sub">Correo: <a href="mailto:${esc(i.correo)}">${esc(i.correo)}</a></p>` : ""}${i.web ? `<p class="sub">Web: <a href="${esc(i.web)}" target="_blank" rel="noopener">${esc(i.web)}</a></p>` : ""}
