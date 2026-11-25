@@ -1,6 +1,9 @@
+import io
+import json
 import random
 import re
-from datetime import datetime, timedelta, timezone
+import zipfile
+from datetime import date, timedelta
 
 import httpx
 
@@ -9,7 +12,6 @@ from ..collectors import base
 from ..valoracion import norm
 from .ubicador import capital, capitales
 
-API = "https://contratacionesabiertas.oece.gob.pe/api/v1/releasesAfter"
 
 RUBROS = {
     "maquinaria": r"maquinari|excavadora|retroexcavadora|cargador frontal|motoniveladora|rodillo|tractor|grua|gr[uú]a|montacarga|compactadora|minicargador|perforadora",
@@ -79,7 +81,7 @@ def desde_release(rel, tc):
         "departamento": lugar.get("departamento"), "provincia": lugar.get("provincia"), "distrito": lugar.get("distrito"),
         "lat": punto[0] if punto else None, "lng": punto[1] if punto else None,
         "monto_usd": round(monto / tc, 2) if monto and valor.get("currency") == "PEN" else monto,
-        "fecha_publicacion": (rel.get("date") or "")[:10] or None,
+        "fecha_publicacion": (tender.get("datePublished") or rel.get("date") or "")[:10] or None,
         "fecha_limite": ((tender.get("tenderPeriod") or {}).get("endDate") or "")[:10] or None,
         "url": docs[0] if docs else f"https://contratacionesabiertas.oece.gob.pe/proceso/{rel.get('ocid')}",
         "metodo": tender.get("procurementMethodDetails"),
@@ -93,36 +95,65 @@ class Navegador:
         return httpx.get(url, params=params, headers=base.HEADERS, timeout=90)
 
 
-def seace(db, p, dias=21, maximo_paginas=400, http=None):
+ARCHIVO = "https://contratacionesabiertas.oece.gob.pe/api/v1/file/seace_v3/json/{y}/{m:02d}/"
+
+
+def paquetes(contenido):
+    if contenido[:2] == b"PK":
+        with zipfile.ZipFile(io.BytesIO(contenido)) as z:
+            for nombre in z.namelist():
+                if nombre.endswith(".json"):
+                    yield json.loads(z.read(nombre))
+    else:
+        yield json.loads(contenido)
+
+
+def releases(paquete):
+    for x in paquete.get("records") or paquete.get("releases") or []:
+        if "compiledRelease" in x:
+            yield x["compiledRelease"]
+        elif "releases" in x and x["releases"] and isinstance(x["releases"][-1], dict) and "tender" in x["releases"][-1]:
+            yield x["releases"][-1]
+        else:
+            yield x
+
+
+def abierta(rel, hoy):
+    t = rel.get("tender") or {}
+    fin = ((t.get("tenderPeriod") or {}).get("endDate") or "")[:10]
+    if fin:
+        return fin >= hoy
+    publicada = (t.get("datePublished") or rel.get("date") or "")[:10]
+    return publicada >= (date.fromisoformat(hoy) - timedelta(days=10)).isoformat()
+
+
+def seace(db, p, http=None):
     http = http or Navegador()
-    limite = (datetime.now(timezone.utc) - timedelta(days=dias)).date().isoformat()
+    hoy = date.today()
+    periodos = [(hoy.year, hoy.month)]
+    if hoy.day <= 15:
+        anterior = hoy.replace(day=1) - timedelta(days=1)
+        periodos.append((anterior.year, anterior.month))
     vistos = {f["clave"] for f in db.select_all("oportunidades", select="clave", fuente="eq.seace")}
-    url, params, nuevas, paginas, repetidas = API, {"format": "json", "order": "desc"}, 0, 0, 0
-    while url and paginas < maximo_paginas:
-        r = http.get(url, params=params)
+    resumen = {"leidas": 0, "abiertas": 0, "nuevas": 0}
+    for y, m in periodos:
+        r = http.get(ARCHIVO.format(y=y, m=m))
         r.raise_for_status()
-        datos = r.json()
-        paginas += 1
-        filas, viejo = [], False
-        for rel in datos.get("releases", []):
-            if (rel.get("date") or "")[:10] < limite:
-                viejo = True
-                continue
-            if "tender" not in (rel.get("tag") or ["tender"]) and not rel.get("tender"):
-                continue
-            fila = desde_release(rel, p["tipo_cambio"])
-            if fila:
-                repetidas += fila["clave"] in vistos
-                filas.append(fila)
-        if filas:
-            unicas = list({f["clave"]: f for f in filas}.values())
-            db.upsert("oportunidades", unicas, on_conflict="clave")
-            nuevas += sum(1 for f in unicas if f["clave"] not in vistos)
-            vistos.update(f["clave"] for f in unicas)
-        if viejo:
-            break
-        url, params = (datos.get("links") or {}).get("next"), None
-    return {"paginas": paginas, "nuevas": nuevas, "repetidas": repetidas}
+        filas = {}
+        for paquete in paquetes(r.content):
+            for rel in releases(paquete):
+                resumen["leidas"] += 1
+                if not abierta(rel, hoy.isoformat()):
+                    continue
+                fila = desde_release(rel, p["tipo_cambio"])
+                if fila:
+                    filas[fila["clave"]] = fila
+        lista = list(filas.values())
+        for k in range(0, len(lista), 500):
+            db.upsert("oportunidades", lista[k:k + 500], on_conflict="clave")
+        resumen["abiertas"] += len(lista)
+        resumen["nuevas"] += sum(1 for f in lista if f["clave"] not in vistos)
+    return resumen
 
 
 def web(db, p, departamentos=None):
