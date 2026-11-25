@@ -140,7 +140,7 @@ def leer_bases(db, descargar=None, limite=150):
         return {"omitido": "sin perfil o sin IA"}
     descargar = descargar or (lambda url: base.descargar(url, intentos=2))
     candidatas = [c for c in db.select_all("coincidencias", select="oportunidad_id,puntaje,bases_leidas,requisitos", perfil_id=f"eq.{p['id']}", encaja="eq.true")
-                  if not c.get("bases_leidas") or "sin_experiencia" not in (c.get("requisitos") or {})]
+                  if not (c.get("requisitos") or {}).get("no_legible") and (not c.get("bases_leidas") or "sin_experiencia" not in (c.get("requisitos") or {}))]
     candidatas = sorted(candidatas, key=lambda c: -(c.get("puntaje") or 0))[:limite]
     leidas = 0
     for c in candidatas:
@@ -150,6 +150,9 @@ def leer_bases(db, descargar=None, limite=150):
         try:
             texto = descargar(o["url"])
             texto = texto[5:] if texto.startswith("<pdf>") else re.sub(r"<[^>]+>", " ", texto)
+            if len(re.findall(r"[a-záéíóúñ]{4,}", texto.lower())) < 80:
+                db.update("coincidencias", {"bases_leidas": True, "requisitos": {"no_legible": True}}, oportunidad_id=f"eq.{c['oportunidad_id']}", perfil_id=f"eq.{p['id']}")
+                continue
             req = llm.pedir_json(PROMPT_BASES.format(perfil=p["descripcion"], activos=activos_texto(p), texto=texto[:30000],
                                                      empresa="Tiene empresa (persona jurídica)." if p.get("tiene_empresa") else "NO tiene empresa: es persona natural.",
                                                      costos=p.get("costos") or "no los indicó"))

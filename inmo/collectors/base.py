@@ -24,6 +24,30 @@ def _texto_pdf(contenido):
     return "\n".join((p.extract_text() or "") for p in paginas[:80])
 
 
+def texto_archivo(contenido, nivel=0):
+    """Texto de un PDF, Word (.docx) o ZIP con esos archivos. '' si no se puede leer."""
+    import zipfile
+    from io import BytesIO
+    try:
+        if contenido[:4] == b"%PDF":
+            return _texto_pdf(contenido)
+        if contenido[:2] != b"PK" or nivel > 1:
+            return ""
+        z = zipfile.ZipFile(BytesIO(contenido))
+        if "word/document.xml" in z.namelist():
+            xml = z.read("word/document.xml").decode("utf-8", "ignore")
+            return re.sub(r"<[^>]+>", "", xml.replace("</w:p>", "\n"))
+        partes = []
+        for n in sorted(z.namelist(), key=lambda n: ("bases" not in n.lower(), n)):
+            if n.lower().endswith((".pdf", ".docx", ".zip")):
+                partes.append(texto_archivo(z.read(n), nivel + 1))
+            if sum(map(len, partes)) > 60000:
+                break
+        return "\n".join(partes)
+    except Exception:
+        return ""
+
+
 def descargar(url, intentos=3, pausa=(1.5, 4.0)):
     ultimo = None
     for n in range(intentos):
@@ -35,8 +59,8 @@ def descargar(url, intentos=3, pausa=(1.5, 4.0)):
             if r.status_code == 200:
                 time.sleep(random.uniform(*pausa))
                 tipo = r.headers.get("content-type", "")
-                if "pdf" in tipo or url.lower().split("?")[0].endswith(".pdf"):
-                    return "<pdf>" + _texto_pdf(r.content)
+                if "pdf" in tipo or url.lower().split("?")[0].endswith(".pdf") or r.content[:4] == b"%PDF" or r.content[:2] == b"PK":
+                    return "<pdf>" + texto_archivo(r.content)
                 return r.text
             ultimo = f"HTTP {r.status_code}"
             if r.status_code == 404:
