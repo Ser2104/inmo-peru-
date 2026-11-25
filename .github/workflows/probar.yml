@@ -8,6 +8,9 @@ on:
       urls:
         description: URLs separadas por espacio
         default: ""
+      fuentes:
+        description: fuentes separadas por espacio
+        default: ""
 jobs:
   probar:
     runs-on: ubuntu-latest
@@ -31,4 +34,4 @@ jobs:
         run: |
           docker run -d --name searxng -p 8080:8080 -v "$PWD/searxng:/etc/searxng" searxng/searxng:latest
           for i in $(seq 1 30); do curl -sf "http://localhost:8080/search?q=test&format=json" >/dev/null && break; sleep 2; done
-      - run: python -m inmo.cli ${{ inputs.tarea }} --urls ${{ inputs.urls }}
+      - run: python -m inmo.cli ${{ inputs.tarea }} --urls ${{ inputs.urls }} --fuentes ${{ inputs.fuentes }}

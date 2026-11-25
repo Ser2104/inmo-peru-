@@ -85,8 +85,15 @@ def desde_release(rel, tc):
     }
 
 
+class Navegador:
+    def get(self, url, params=None):
+        if base.cffi:
+            return base.cffi.get(url, params=params, impersonate="chrome", headers={"Accept": "application/json", "Accept-Language": "es-PE,es;q=0.9"}, timeout=90)
+        return httpx.get(url, params=params, headers=base.HEADERS, timeout=90)
+
+
 def seace(db, p, dias=21, maximo_paginas=400, http=None):
-    http = http or httpx.Client(timeout=90, headers={"User-Agent": "inmo-peru/1.0"})
+    http = http or Navegador()
     limite = (datetime.now(timezone.utc) - timedelta(days=dias)).date().isoformat()
     vistos = {f["clave"] for f in db.select_all("oportunidades", select="clave", fuente="eq.seace")}
     url, params, nuevas, paginas, repetidas = API, {"format": "json", "order": "desc"}, 0, 0, 0
