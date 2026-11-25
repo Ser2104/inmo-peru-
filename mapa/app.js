@@ -191,16 +191,16 @@ async function abrir(i) {
     abrirPanel("detalle");
     return;
   }
-  const dias = i.estrategia === "temporal";
+  const porDias = i.estrategia === "temporal";
   p.innerHTML = encabezado(i, i.veredicto, COLOR_VEREDICTO[i.veredicto] ?? COLOR.rojo) + `
     <span class="sub"> &nbsp;${i.puntaje_total == null ? "Puntaje no confiable: datos del aviso dudosos" : `Puntaje ${i.puntaje_total.toFixed(1)}/10 · confianza ${esc(i.confianza)}`}</span>
     <div class="plazos">${barra("Corto plazo", i.puntaje_corto)}${barra("Mediano plazo", i.puntaje_mediano)}${barra("Largo plazo", i.puntaje_largo)}</div>
     <div class="grid">
       <div class="dato"><small>Precio</small><b>${usd(i.precio_usd)}</b></div>
       <div class="dato"><small>Te conviene pagar hasta</small><b>${usd(i.precio_max_recomendado)}</b></div>
-      <div class="dato"><small>Mejor forma de alquilar</small><b>${dias ? "Airbnb 🏖️" : "Largo plazo 🏠"}</b></div>
-      <div class="dato"><small>Te quedaría al mes</small><b>${usd(dias ? i.flujo_mensual_temporal : i.flujo_mensual_usd)}</b></div>
-      <div class="dato"><small>Ganancia anual (10 años)</small><b>${pct(dias ? i.tir_10_temporal : i.tir_10)}</b></div>
+      <div class="dato"><small>Mejor forma de alquilar</small><b>${porDias ? "Airbnb 🏖️" : "Largo plazo 🏠"}</b></div>
+      <div class="dato"><small>Te quedaría al mes</small><b>${usd(porDias ? i.flujo_mensual_temporal : i.flujo_mensual_usd)}</b></div>
+      <div class="dato"><small>Ganancia anual (10 años)</small><b>${pct(porDias ? i.tir_10_temporal : i.tir_10)}</b></div>
       <div class="dato"><small>Frente a su zona</small><b>${i.descuento_vs_zona == null ? "—" : Math.abs(i.descuento_vs_zona * 100).toFixed(0) + "% " + (i.descuento_vs_zona > 0 ? "más barato" : "más caro")}</b></div>
     </div>${confirmacion(i)}${aprox}${i.tipo === "local" ? zona(i.entorno, "¿Para qué negocio sirve este local?") : ""}<div id="extra"><p class="sub" style="margin-top:14px">Cargando análisis completo…</p></div>${enlace}`;
   abrirPanel("detalle");
