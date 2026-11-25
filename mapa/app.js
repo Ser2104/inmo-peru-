@@ -349,7 +349,12 @@ function paraTi(i) {
   return `<h3>🎯 ¿Te sirve? ${i.encaja ? `<span style="color:${COLOR.verde}">Sí (${i.puntaje_perfil ?? "—"}/100)</span>` : `<span style="color:${COLOR.rojo}">No</span>`}</h3>
     <p class="sub">${esc(i.razon || "")}</p>${filas.length ? `<table>${filas.map(([k, v]) => `<tr><td>${k}</td><td>${esc(v)}</td></tr>`).join("")}</table>` : ""}
     ${(r.requisitos_clave || []).length ? `<p class="sub">Requisitos: ${r.requisitos_clave.map(esc).join(" · ")}</p>` : ""}
-    ${i.requisitos ? '<p class="sub">✔ Revisado leyendo las bases oficiales.</p>' : '<p class="sub">Revisado con el resumen; las bases se leen en el próximo ciclo de tu PC.</p>'}`;
+    ${r.sin_empresa == null ? "" : `<h3>¿Puedes postular sin empresa?</h3><p><b style="color:${r.sin_empresa ? COLOR.verde : COLOR.rojo}">${r.sin_empresa ? "Sí, como persona natural con RUC" : "No, piden empresa o una autorización de empresa"}</b><br><span class="sub">${esc(r.sin_empresa_por_que || "")}</span></p>`}
+    ${(r.para_postular || []).length ? `<h3>Lo que necesitas antes de postular</h3><ul>${r.para_postular.map((x) => `<li>${esc(typeof x === "string" ? x : Object.values(x).join(" — "))}</li>`).join("")}</ul>` : ""}
+    ${(r.costos || []).length ? `<h3>Costos y ganancia ${r.costos_estimados ? "(estimados con precios típicos)" : "(con tus costos)"}</h3><table>${r.costos.map((c) => `<tr><td>${esc(c.concepto)}</td><td>S/ ${Math.round(+c.soles || 0).toLocaleString("es-PE")}</td></tr>`).join("")}
+      <tr><td><b>Cobrarías</b></td><td><b>S/ ${Math.round(+r.ingreso_soles || 0).toLocaleString("es-PE")}</b></td></tr>
+      <tr><td><b>Te quedaría</b></td><td><b style="color:${(+r.ganancia_soles || 0) > 0 ? COLOR.verde : COLOR.rojo}">S/ ${Math.round(+r.ganancia_soles || 0).toLocaleString("es-PE")}${r.margen != null ? ` (${Math.round(r.margen * 100)}%)` : ""}</b></td></tr></table>` : ""}
+    ${i.requisitos ? '<p class="sub">✔ Revisado leyendo las bases oficiales. Para el Estado, como persona natural basta RUC activo y habido + RNP (S/ 29, vigencia indefinida), salvo que las bases pidan otra cosa.</p>' : '<p class="sub">Revisado con el resumen; las bases se leen en el próximo ciclo de tu PC.</p>'}`;
 }
 
 function filaActivo(a = {}) {
@@ -365,10 +370,12 @@ $("p-agregar").onclick = () => filaActivo();
 async function abrirPerfil() {
   abrirPanel("perfil");
   if (DEMO) return;
-  const { data } = await sb.from("perfiles").select("descripcion,departamentos,activos").eq("id", "principal").single();
+  const { data } = await sb.from("perfiles").select("descripcion,departamentos,activos,tiene_empresa,costos").eq("id", "principal").single();
   $("p-activos").innerHTML = "";
   (data?.activos?.length ? data.activos : [{}]).forEach(filaActivo);
   $("p-desc").value = data?.descripcion || "";
+  $("p-empresa").checked = !!data?.tiene_empresa;
+  $("p-costos").value = data?.costos || "";
   $("p-deps").value = (data?.departamentos || []).join(", ");
 }
 $("b-perfil").onclick = abrirPerfil;
@@ -376,7 +383,7 @@ $("b-paramí").onclick = () => { estado.paraMi = !estado.paraMi; $("b-paramí").
 $("p-guardar").onclick = async () => {
   const deps = $("p-deps").value.split(",").map((x) => x.trim()).filter(Boolean);
   const activos = [...$("p-activos").children].map((d) => { const [q, c, det] = d.querySelectorAll("input"); return { que: q.value.trim(), cantidad: +c.value || 1, detalle: det.value.trim() }; }).filter((a) => a.que);
-  const { error } = await sb.from("perfiles").update({ descripcion: $("p-desc").value.trim(), departamentos: deps.length ? deps : null, activos }).eq("id", "principal");
+  const { error } = await sb.from("perfiles").update({ descripcion: $("p-desc").value.trim(), departamentos: deps.length ? deps : null, activos, tiene_empresa: $("p-empresa").checked, costos: $("p-costos").value.trim() || null }).eq("id", "principal");
   $("p-msg").textContent = error ? error.message : "✅ Guardado. La IA volverá a revisar todas las convocatorias en el próximo ciclo (máx. 6 horas).";
 };
 

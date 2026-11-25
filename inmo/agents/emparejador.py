@@ -26,10 +26,22 @@ CONVOCATORIAS:
 PROMPT_BASES = """Estas son las bases de una convocatoria del Estado peruano. El proveedor tiene esto:
 \"\"\"{perfil}\"\"\"
 Sus equipos: {activos}
-Extrae un objeto JSON con: fecha_limite (AAAA-MM-DD para presentar ofertas, o null), cantidad (de unidades o servicios),
-tipo_requerido (qué vehículo o equipo exacto piden), antiguedad_maxima (años, o null), con_conductor (true/false/null),
-plazo (duración del servicio), lugar (dónde se presta), monto_referencial (número o null), requisitos_clave (lista de máx. 6 textos cortos:
-RNP, experiencia, SOAT, GPS, seguros, garantías...), cumple (true/false: si con lo que tiene podría cumplir), por_que (máx. 160 caracteres).
+{empresa}
+Sus costos: {costos}
+
+Extrae un objeto JSON con:
+fecha_limite (AAAA-MM-DD para presentar ofertas, o null), cantidad, tipo_requerido (qué vehículo o equipo exacto piden),
+antiguedad_maxima (años, o null), con_conductor (true/false/null), plazo (duración del servicio), lugar (dónde se presta),
+monto_referencial (número en soles, o null), requisitos_clave (máx. 6 textos cortos),
+cumple (true/false: si con lo que tiene podría cumplir), por_que (máx. 160 caracteres),
+sin_empresa (true si las bases permiten postular como persona natural con RUC, false si exigen persona jurídica o una autorización
+que solo dan a empresas, null si no lo dicen), sin_empresa_por_que (máx. 160 caracteres),
+para_postular (lista de lo que debe tener o tramitar antes, con costo si lo sabes: RUC activo y habido, RNP de bienes/servicios,
+autorización MTC, licencias, SOAT, GPS, pólizas, experiencia mínima, garantías...),
+costos (lista de objetos {{concepto, soles}} con lo que le costaría cumplir TODO el contrato: combustible, conductores, mantenimiento,
+seguros/SOAT, GPS, trámites, garantías o retención, impuestos; usa sus costos si los dio, si no usa precios típicos del Perú),
+costos_estimados (true si usaste precios típicos y no los suyos), ingreso_soles (monto que cobraría), ganancia_soles, margen (0 a 1).
+Si las bases no dan un dato, usa null. No inventes requisitos que no aparezcan.
 
 BASES:
 {texto}"""
@@ -103,7 +115,9 @@ def leer_bases(db, descargar=None, limite=60):
         try:
             texto = descargar(o["url"])
             texto = texto[5:] if texto.startswith("<pdf>") else re.sub(r"<[^>]+>", " ", texto)
-            req = llm.pedir_json(PROMPT_BASES.format(perfil=p["descripcion"], activos=activos_texto(p), texto=texto[:30000]))
+            req = llm.pedir_json(PROMPT_BASES.format(perfil=p["descripcion"], activos=activos_texto(p), texto=texto[:30000],
+                                                     empresa="Tiene empresa (persona jurídica)." if p.get("tiene_empresa") else "NO tiene empresa: es persona natural.",
+                                                     costos=p.get("costos") or "no los indicó"))
         except Exception:
             db.update("coincidencias", {"bases_leidas": True}, oportunidad_id=f"eq.{c['oportunidad_id']}", perfil_id=f"eq.{p['id']}")
             continue

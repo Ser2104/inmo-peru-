@@ -114,6 +114,8 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;borde
   <label>Mis equipos</label><div id="p-activos"></div><button class="btn" id="p-agregar" type="button">+ Agregar equipo</button>
   <label>Qué ofreces y qué no (con tus palabras)</label>
   <textarea id="p-desc" rows="5" style="width:100%;font:inherit"></textarea>
+  <label><input type="checkbox" id="p-empresa"> Tengo empresa (persona jurídica)</label>
+  <label>Mis costos (opcional, mejora el cálculo)</label><textarea id="p-costos" rows="3" style="width:100%;font:inherit" placeholder="Ej.: camioneta con chofer me cuesta S/ 180 por día; combustible S/ 60 diarios; chofer S/ 2,000 al mes"></textarea>
   <label>Departamentos donde trabajas (vacío = todo el Perú)</label><input id="p-deps" placeholder="Arequipa, Moquegua, Cusco" style="width:100%">
   <button class="btn activo" id="p-guardar" style="margin-top:10px">Guardar</button><p class="sub" id="p-msg"></p></div>
 <div class="panel" id="detalle"><button class="cerrar" data-cierra="detalle">×</button><div id="contenido"></div></div>
