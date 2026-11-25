@@ -2,6 +2,10 @@ import hashlib
 import math
 import time
 
+import json
+from functools import lru_cache
+from pathlib import Path
+
 import httpx
 
 from ..valoracion import norm
@@ -11,6 +15,24 @@ AGENTE = "inmo-peru/1.0 (github.com/Ser2104/inmo-peru)"
 LIMITE_PERU = (-18.4, -81.4, 0.1, -68.6)
 POBLADO = "poblado|"
 MAX_KM_DIRECCION = 8
+
+
+@lru_cache
+def capitales():
+    return json.loads((Path(__file__).resolve().parent.parent / "data" / "capitales.json").read_text())
+
+
+def capital(inm):
+    dep, prov, dist = (norm(inm.get(k)) for k in ("departamento", "provincia", "distrito"))
+    c = capitales()
+    if f"{dep}|{prov}|{dist}" in c:
+        return tuple(c[f"{dep}|{prov}|{dist}"])
+    opciones = [v for k, v in c.items() if k.startswith(f"{dep}|") and k.endswith(f"|{dist}")] if dist else []
+    if len(opciones) == 1:
+        return tuple(opciones[0])
+    if not dist and prov and f"{dep}|{prov}|{prov}" in c:
+        return tuple(c[f"{dep}|{prov}|{prov}"])
+    return None
 
 
 def km(a, b):
@@ -64,6 +86,9 @@ class Ubicador:
         return punto
 
     def centro(self, inm):
+        punto = capital(inm)
+        if punto:
+            return punto
         lugar = ", ".join(x for x in (inm.get("distrito"), inm.get("provincia"), inm.get("departamento")) if x)
         opciones = [f"{POBLADO}{lugar}, Perú" if lugar else None, f"{POBLADO}{inm.get('distrito')}, {inm.get('departamento')}, Perú" if inm.get("distrito") else None,
                     f"{lugar}, Perú" if lugar else None, f"{POBLADO}{inm.get('departamento')}, Perú" if inm.get("departamento") else None]

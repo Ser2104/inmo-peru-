@@ -16,9 +16,8 @@ def test_direccion_distrito_y_cache():
     u = ubicador.Ubicador(db, falso(llamadas))
     assert u.ubicar({"id": "a", "direccion": "Av. Ejército 123", "distrito": "Yanahuara", "provincia": "Arequipa", "departamento": "Arequipa"})[2] == "direccion"
     lat, lng, prec = u.ubicar({"id": "b", "distrito": "Cayma", "provincia": "Arequipa", "departamento": "Arequipa"})
-    assert prec == "distrito" and (lat, lng) != (-16.37, -71.55) and abs(lat + 16.37) < 0.01
-    u.ubicar({"id": "c", "distrito": "Cayma", "provincia": "Arequipa", "departamento": "Arequipa"})
-    assert llamadas.count("Cayma, Arequipa, Arequipa, Perú") == 1
+    assert prec == "distrito" and abs(lat + 16.3625) < 0.01
+    assert not any("Cayma" in x for x in llamadas)
     assert ubicador.Ubicador(db, falso([])).cache
 
 
@@ -41,11 +40,11 @@ def test_prefiere_el_pueblo_y_rechaza_direcciones_lejanas():
                "calle lejana 1, cayma, arequipa, arequipa, peru": (-15.9, -71.0)}
     u = ubicador.Ubicador(FakeDB(), lambda t: lugares.get(ubicador.norm(t)))
     lat, lng, prec = u.ubicar({"id": "x", "direccion": "Calle Lejana 1", "distrito": "Cayma", "provincia": "Arequipa", "departamento": "Arequipa"})
-    assert prec == "distrito" and abs(lat + 16.38) < 0.01
+    assert prec == "distrito" and abs(lat + 16.3625) < 0.01
 
 
 def test_reubicar_mueve_puntos_del_centro_geografico(monkeypatch):
     db = FakeDB()
     db.upsert("inmuebles", {"url": "1", "activo": True, "lat": -16.20, "lng": -71.45, "ubicacion_precision": "distrito", "distrito": "Cayma", "provincia": "Arequipa", "departamento": "Arequipa"})
     monkeypatch.setattr(ubicador, "consultar", lambda t: {"poblado|cayma, arequipa, arequipa, peru": (-16.38, -71.545)}.get(ubicador.norm(t)))
-    assert ubicador.reubicar(db)["reubicados"] == 1 and abs(db.t["inmuebles"][0]["lat"] + 16.38) < 0.01
+    assert ubicador.reubicar(db)["reubicados"] == 1 and abs(db.t["inmuebles"][0]["lat"] + 16.3625) < 0.01
