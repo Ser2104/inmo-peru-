@@ -64,10 +64,12 @@ def paginas_candidatas(sitio):
 
 
 def sitios(db):
+    registrados = db.select_all("sitios", select="dominio,origen,paginas", estado="eq.inmobiliaria")
+    primero = [s["dominio"] for s in sorted(registrados, key=lambda s: (s["origen"] != "usuario", s["paginas"]))]
     fuentes = [u for f in db.select("fuentes", select="urls,tipo,activo", tipo="eq.ia", activo="eq.true") for u in f["urls"]]
     pistas = [p["url"] for p in db.select_all("pistas", select="url", estado="eq.verificada") if p.get("url")]
-    dominios = {dominio(u) for u in fuentes + pistas if u and u.startswith("http")}
-    return sorted(d for d in dominios if d and d not in GRANDES and not any(d.endswith("." + g) for g in GRANDES))
+    otros = sorted({dominio(u) for u in fuentes + pistas if u and u.startswith("http")} - set(primero))
+    return [d for d in primero + otros if d and d not in GRANDES and not any(d.endswith("." + g) for g in GRANDES)]
 
 
 SITEMAPS_PORTALES = {"nexoinmobiliario": "https://nexoinmobiliario.pe/sitemap-proyectos.xml"}
@@ -105,6 +107,7 @@ def ejecutar(db, p, por_sitio=None, max_sitios=None):
     for sitio in sitios(db)[:max_sitios]:
         nuevas = [u for u in paginas_candidatas(sitio) if u not in vistos][:por_sitio]
         resumen["sitios"] += 1
+        avisos_sitio = 0
         for url in nuevas:
             try:
                 items = ia.extraer(base.descargar(url, intentos=1), url)
@@ -116,6 +119,10 @@ def ejecutar(db, p, por_sitio=None, max_sitios=None):
             db.upsert("rastreo", {"url": url, "dominio": dominio(url), "visto": datetime.now(timezone.utc).isoformat(), "avisos": len(filas)}, on_conflict="url")
             vistos.add(url)
             resumen["paginas_nuevas"] += 1
+            avisos_sitio += len(filas)
+        previo = (db.select("sitios", select="paginas,avisos", dominio=f"eq.{sitio}") or [None])[0]
+        if previo and nuevas:
+            db.update("sitios", {"paginas": previo["paginas"] + len(nuevas), "avisos": previo["avisos"] + avisos_sitio}, dominio=f"eq.{sitio}")
     for fuente, sitemap in SITEMAPS_PORTALES.items():
         try:
             resumen[fuente] = portal_completo(db, p, fuente, sitemap)

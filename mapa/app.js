@@ -420,6 +420,18 @@ async function pistas() {
 }
 $("b-contactar").onclick = () => $("contactar").classList.contains("abierto") ? $("contactar").classList.remove("abierto") : (abrirPanel("contactar"), pistas());
 
+$("w-agregar").onclick = async () => {
+  let url = $("w-url").value.trim();
+  if (!url) return;
+  if (!/^https?:\/\//.test(url)) url = "https://" + url;
+  let d;
+  try { d = new URL(url).hostname.replace(/^www\./, ""); } catch { $("w-msg").textContent = "Esa dirección no es válida."; return; }
+  if (DEMO) { $("w-msg").textContent = "No disponible en modo ejemplo."; return; }
+  const { error } = await sb.from("sitios").insert({ dominio: d, url, ciudad: $("w-ciudad").value.trim() || null, origen: "usuario" });
+  $("w-msg").textContent = error ? (error.code === "23505" ? "Esa web ya está en la lista: se revisa en cada ciclo." : error.message) : "✅ Agregada. Sus proyectos aparecerán después del próximo ciclo diario.";
+  if (!error) $("w-url").value = "";
+};
+
 async function entrar(crear) {
   const email = $("correo").value, password = $("clave").value;
   const { error } = crear ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
