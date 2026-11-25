@@ -92,13 +92,13 @@ def en_pausa(fuente):
     return bool(hasta) and datetime.fromisoformat(hasta) > datetime.now(timezone.utc)
 
 
-def recolectar_fuente(db, fuente, p, completo=False, reparar=None):
+def recolectar_fuente(db, fuente, p, completo=False, reparar=None, sin_limite=False):
     if en_pausa(fuente) and not completo:
         return {"fuente": fuente["id"], "omitido": f"en pausa hasta {fuente['config']['pausado_hasta']}"}
     tc = p["tipo_cambio"]
     nuevos = total = 0
     errores = []
-    limite = config.MAX_PAGINAS * (5 if completo else 1)
+    limite = 2000 if sin_limite else config.MAX_PAGINAS * (5 if completo else 1)
     hace_un_dia = datetime.now(timezone.utc) - timedelta(days=1)
     vistos = set()
     for plantilla in fuente["urls"]:

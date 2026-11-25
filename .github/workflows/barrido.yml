@@ -1,0 +1,44 @@
+name: barrido
+on:
+  schedule:
+    - cron: "0 4 * * 6"
+  workflow_dispatch:
+jobs:
+  leer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        fuente: [urbania-lima-venta, urbania-lima-alquiler, urbania-regiones]
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      MINUTOS_POR_PASO: "330"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m inmo.cli barrer --fuentes ${{ matrix.fuente }}
+  analizar:
+    needs: leer
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    concurrency: agentes
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: for t in auditar reubicar ubicar analizar; do python -m inmo.cli $t; done

@@ -46,13 +46,22 @@ def recolectar(db, p, completo):
 def main():
     ap = argparse.ArgumentParser(description="Analizador inmobiliario Perú")
     ap.add_argument("tarea", choices=["ciclo", "completo", "bcrp", "buscar", "analizar", "auditar", "alertas", "mejorar",
-                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear", "rapido", "concesiones", "confirmar"])
+                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear", "rapido", "concesiones", "confirmar", "reubicar", "barrer"])
     ap.add_argument("--urls", nargs="*")
     ap.add_argument("--departamentos", nargs="*")
+    ap.add_argument("--fuentes", nargs="*", default=[])
     a = ap.parse_args()
     db = DB()
     if a.tarea == "diagnostico":
         sys.exit(0 if mantenimiento.diagnostico(db)["ok"] else 1)
+    if a.tarea == "barrer":
+        p = db.parametros()
+        for f in db.select("fuentes", select="*", id=f"in.({','.join(a.fuentes)})"):
+            paso(db, f"barrido:{f['id']}", lambda f=f: runner.recolectar_fuente(db, f, p, completo=True, reparar=mejora.reparar_selectores, sin_limite=True))
+        return
+    if a.tarea == "reubicar":
+        print(ubicador.reubicar(db), ubicador.reubicar(db, "concesiones"))
+        return
     if a.tarea == "renormalizar":
         print(mantenimiento.renormalizar(db))
         return

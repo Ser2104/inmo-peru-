@@ -9,6 +9,12 @@ from ..valoracion import norm
 NOMINATIM = "https://nominatim.openstreetmap.org/search"
 AGENTE = "inmo-peru/1.0 (github.com/Ser2104/inmo-peru)"
 LIMITE_PERU = (-18.4, -81.4, 0.1, -68.6)
+POBLADO = "poblado|"
+MAX_KM_DIRECCION = 8
+
+
+def km(a, b):
+    return 6371 * math.acos(min(1, math.sin(math.radians(a[0])) * math.sin(math.radians(b[0])) + math.cos(math.radians(a[0])) * math.cos(math.radians(b[0])) * math.cos(math.radians(a[1] - b[1]))))
 
 
 def dentro_peru(lat, lng):
@@ -17,7 +23,11 @@ def dentro_peru(lat, lng):
 
 
 def consultar(texto, esperar=1.1):
-    r = httpx.get(NOMINATIM, params={"q": texto, "format": "json", "limit": 1, "countrycodes": "pe"}, headers={"User-Agent": AGENTE}, timeout=30)
+    poblado = texto.startswith(POBLADO)
+    params = {"q": texto.removeprefix(POBLADO), "format": "json", "limit": 1, "countrycodes": "pe"}
+    if poblado:
+        params["featureType"] = "settlement"
+    r = httpx.get(NOMINATIM, params=params, headers={"User-Agent": AGENTE}, timeout=30)
     time.sleep(esperar)
     r.raise_for_status()
     datos = r.json()
@@ -53,18 +63,25 @@ class Ubicador:
         self.nuevas += 1
         return punto
 
-    def ubicar(self, inm):
+    def centro(self, inm):
         lugar = ", ".join(x for x in (inm.get("distrito"), inm.get("provincia"), inm.get("departamento")) if x)
-        if inm.get("direccion") and lugar:
-            punto = self.buscar(f"{inm['direccion']}, {lugar}, Perú")
-            if punto:
-                return (*punto, "direccion")
-        for texto in (f"{lugar}, Perú" if lugar else None, f"{inm.get('distrito')}, Perú" if inm.get("distrito") else None, f"{inm.get('departamento')}, Perú" if inm.get("departamento") else None):
+        opciones = [f"{POBLADO}{lugar}, Perú" if lugar else None, f"{POBLADO}{inm.get('distrito')}, {inm.get('departamento')}, Perú" if inm.get("distrito") else None,
+                    f"{lugar}, Perú" if lugar else None, f"{POBLADO}{inm.get('departamento')}, Perú" if inm.get("departamento") else None]
+        for texto in opciones:
             if texto:
                 punto = self.buscar(texto)
                 if punto:
-                    return (*desplazar(*punto, inm["id"]), "distrito")
+                    return punto
         return None
+
+    def ubicar(self, inm):
+        centro = self.centro(inm)
+        lugar = ", ".join(x for x in (inm.get("distrito"), inm.get("provincia"), inm.get("departamento")) if x)
+        if inm.get("direccion") and lugar:
+            punto = self.buscar(f"{inm['direccion']}, {lugar}, Perú")
+            if punto and (not centro or km(punto, centro) <= MAX_KM_DIRECCION):
+                return (*punto, "direccion")
+        return (*desplazar(*centro, inm["id"]), "distrito") if centro else None
 
 
 def ejecutar(db, limite_direcciones=700):
@@ -87,7 +104,26 @@ def ejecutar(db, limite_direcciones=700):
             break
         lugar = ", ".join(x for x in (inm.get("distrito"), inm.get("provincia"), inm.get("departamento")) if x)
         punto = u.buscar(f"{inm['direccion']}, {lugar}, Perú") if lugar else None
-        if punto:
+        centro = u.centro(inm)
+        if punto and (not centro or km(punto, centro) <= MAX_KM_DIRECCION):
             db.update("inmuebles", {"lat": punto[0], "lng": punto[1], "ubicacion_precision": "direccion"}, id=f"eq.{inm['id']}")
             afinados += 1
     return {"ubicados_por_distrito": rapidos, "afinados_por_direccion": afinados, "consultas_nuevas": u.nuevas}
+
+
+def reubicar(db, tabla="inmuebles"):
+    u = Ubicador(db)
+    filas = db.select_all(tabla, select="id,distrito,provincia,departamento,lat,lng" + (",ubicacion_precision" if tabla == "inmuebles" else ""), activo="eq.true") if tabla == "inmuebles" else db.select_all(tabla, select="id,distrito,provincia,departamento,lat,lng")
+    movidos = 0
+    for f in filas:
+        if f.get("lat") is None or f.get("ubicacion_precision") == "exacta":
+            continue
+        centro = u.centro(f)
+        if not centro:
+            continue
+        if f.get("ubicacion_precision") == "direccion" and km((f["lat"], f["lng"]), centro) <= MAX_KM_DIRECCION:
+            continue
+        lat, lng = desplazar(*centro, f["id"])
+        db.update(tabla, {"lat": lat, "lng": lng, **({"ubicacion_precision": "distrito"} if tabla == "inmuebles" else {})}, id=f"eq.{f['id']}")
+        movidos += 1
+    return {"reubicados": movidos, "consultas_nuevas": u.nuevas}
