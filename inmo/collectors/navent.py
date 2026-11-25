@@ -36,8 +36,19 @@ def caracteristicas(texto):
     return salida
 
 
+def coordenadas(html):
+    salida = {}
+    for trozo in html.split('"postingId":"')[1:]:
+        id_ = re.match(r"(\d+)", trozo)
+        geo = re.search(r'"geolocation":\{"latitude":(-?\d+\.\d+),"longitude":(-?\d+\.\d+)', trozo.split('"postingId":"')[0])
+        if id_ and geo:
+            salida.setdefault(id_.group(1), (float(geo.group(1)), float(geo.group(2))))
+    return salida
+
+
 def parsear(html, base_url, selectores=None):
     s = {**SELECTORES, **(selectores or {})}
+    coords = coordenadas(html)
     sopa = BeautifulSoup(html, "html.parser")
     items, vistos = [], set()
     for card in sopa.select(s["tarjeta"]):
@@ -74,5 +85,8 @@ def parsear(html, base_url, selectores=None):
         if item["operacion"] == "venta" and monto and moneda == "USD" and monto < 6000 and "venta" not in pista.lower():
             item["operacion"] = "alquiler"
         item["estado"] = estado_desde(pista)
+        id_ = re.search(r"-(\d{6,})(?:\.html)?$", url)
+        if id_ and id_.group(1) in coords:
+            item["lat"], item["lng"] = coords[id_.group(1)]
         items.append(item)
     return items

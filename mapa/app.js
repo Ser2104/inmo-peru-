@@ -5,7 +5,7 @@ const pct = (x) => (x == null ? "—" : (x * 100).toFixed(1) + "%");
 const COLOR = { verde: "#1a7f37", ambar: "#c78a00", rojo: "#c62828", gris: "#6b7280" };
 const DEMO = new URLSearchParams(location.search).has("demo");
 
-const estado = { paraMi: true, capa: "inversion", horizonte: "total", veredictos: new Set(["Comprar", "Negociar", "Revisar a mano"]), zonas: false };
+const estado = { paraMi: true, capa: "inversion", horizonte: "total", veredictos: new Set(["Comprar", "Negociar", "Revisar a mano", "Descartar"]), zonas: false };
 let inmuebles = [], arbitrajes = [], negocios = [], oportunidades = [], sb = null;
 
 const PERU = L.latLngBounds([-18.6, -81.6], [0.2, -68.4]);
@@ -42,6 +42,9 @@ function color(p) {
 
 const dias = (f) => f ? Math.ceil((new Date(f + "T23:59:00") - new Date()) / 864e5) : null;
 const colorOportunidad = (i) => { const d = dias(i.fecha_limite); return d == null ? COLOR.gris : d > 7 ? COLOR.verde : d >= 2 ? COLOR.ambar : COLOR.rojo; };
+const PORTALES = /^(urbania|adondevivir|properati|nexoinmobiliario|infocasas|casas-trovit|casas-mitula|nuroa|doomos|ubicasa)/;
+const REMATES = /^(bbva|remaju|rematesya|rematestributarios|propiedadesenremate|precioderemate)/;
+const origen = (i) => REMATES.test(i.fuente || "") || i.estado === "remate" ? "remates" : PORTALES.test(i.fuente || "") ? "portales" : "independientes";
 const COLOR_VEREDICTO = { "Atractivo": COLOR.verde, "Falta información": COLOR.gris, "Fuera de escala": COLOR.gris, "Comprar": COLOR.verde, "Buena oportunidad": COLOR.verde, "Negociar": COLOR.ambar, "Evaluar": COLOR.ambar, "Revisar a mano": COLOR.ambar };
 const nivelDe = (i) => [COLOR.rojo, COLOR.ambar, COLOR.verde].indexOf(colorDe(i));
 const colorDe = (i) => estado.capa === "oportunidades" ? colorOportunidad(i) : estado.horizonte === "total" || estado.capa !== "inversion" ? (COLOR_VEREDICTO[i.veredicto] ?? COLOR.rojo) : color(puntaje(i));
@@ -65,10 +68,10 @@ function filtrados() {
   if (estado.capa === "arbitraje") {
     return arbitrajes.filter((i) => (!dep || i.departamento === dep) && (!dist || i.distrito === dist) && (i.puntaje ?? 0) >= min);
   }
-  const est = $("f-estrategia").value, tipo = $("f-tipo").value, sit = $("f-estado").value;
+  const est = $("f-estrategia").value, tipo = $("f-tipo").value, sit = $("f-estado").value, org = $("f-origen").value;
   return inmuebles.filter((i) =>
     estado.veredictos.has(i.veredicto) && (!dep || i.departamento === dep) && (!dist || i.distrito === dist) &&
-    (!est || i.estrategia === est) && (!tipo || i.tipo === tipo) && (!sit || i.estado === sit) &&
+    (!est || i.estrategia === est) && (!org || origen(i) === org) && (!tipo || i.tipo === tipo) && (!sit || i.estado === sit) &&
     (i.precio_usd ?? 0) <= precio && (puntaje(i) ?? 0) >= min);
 }
 
@@ -331,7 +334,7 @@ $("modos").querySelectorAll(".btn").forEach((b) => b.onclick = () => {
   dibujar();
 });
 $("f-estrategia").addEventListener("change", modos);
-["f-dist", "f-negocio", "f-rubro", "f-estrategia", "f-tipo", "f-estado", "f-precio"].forEach((id) => $(id).onchange = dibujar);
+["f-dist", "f-origen", "f-negocio", "f-rubro", "f-estrategia", "f-tipo", "f-estado", "f-precio"].forEach((id) => $(id).onchange = dibujar);
 $("f-puntaje").oninput = () => { $("v-puntaje").textContent = $("f-puntaje").value; dibujar(); };
 
 const mensaje = (p) => `Hola, soy asistente de Sergio Yacolca, de YACU Grupo Inmobiliario. Nos interesa invertir en ${p.nombre || "su proyecto"}${p.distrito ? " en " + p.distrito : ""}. ¿Nos podrían enviar precios, metrajes, fecha de entrega, forma de pago y mantenimiento de las unidades disponibles? Gracias.`;

@@ -51,7 +51,7 @@ def recolectar(db, p, completo):
 def main():
     ap = argparse.ArgumentParser(description="Analizador inmobiliario Perú")
     ap.add_argument("tarea", choices=["ciclo", "completo", "bcrp", "buscar", "analizar", "auditar", "alertas", "mejorar",
-                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear", "rapido", "concesiones", "confirmar", "reubicar", "barrer", "oportunidades", "emparejar"])
+                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear", "rapido", "concesiones", "confirmar", "reubicar", "barrer", "oportunidades", "emparejar", "nexo"])
     ap.add_argument("--urls", nargs="*")
     ap.add_argument("--departamentos", nargs="*")
     ap.add_argument("--fuentes", nargs="*", default=[])
@@ -63,6 +63,9 @@ def main():
         p = db.parametros()
         for f in db.select("fuentes", select="*", id=f"in.({','.join(a.fuentes)})"):
             paso(db, f"barrido:{f['id']}", lambda f=f: runner.recolectar_fuente(db, f, p, completo=True, reparar=mejora.reparar_selectores, sin_limite=True))
+        return
+    if a.tarea == "nexo":
+        paso(db, "nexo", lambda: rastreador.portal_completo(db, db.parametros(), "nexoinmobiliario", rastreador.SITEMAPS_PORTALES["nexoinmobiliario"], limite=3000))
         return
     if a.tarea == "reubicar":
         print(ubicador.reubicar(db), ubicador.reubicar(db, "concesiones"))

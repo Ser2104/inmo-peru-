@@ -23,8 +23,25 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python -m inmo.cli barrer --fuentes ${{ matrix.fuente }}
+  nexo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      MINUTOS_POR_PASO: "330"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m inmo.cli nexo
   analizar:
-    needs: leer
+    needs: [leer, nexo]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 340

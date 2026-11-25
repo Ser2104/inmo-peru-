@@ -70,7 +70,36 @@ def sitios(db):
     return sorted(d for d in dominios if d and d not in GRANDES and not any(d.endswith("." + g) for g in GRANDES))
 
 
-def ejecutar(db, p, por_sitio=15, max_sitios=25):
+SITEMAPS_PORTALES = {"nexoinmobiliario": "https://nexoinmobiliario.pe/sitemap-proyectos.xml"}
+
+
+def portal_completo(db, p, fuente, sitemap, limite=150):
+    vistos = {f["url"] for f in db.select_all("rastreo", select="url", dominio=f"eq.{dominio(sitemap)}")}
+    nuevas = [u for u in leer_sitemap(sitemap, limite=20000) if u not in vistos][:limite]
+    total = 0
+    for url in nuevas:
+        try:
+            items = ia.extraer(base.descargar(url, intentos=1), url)
+        except Exception:
+            items = []
+        crudos, usadas = [], set()
+        for n, x in enumerate(items):
+            u = x.get("url") or url
+            if u in usadas:
+                u = f"{u.split('#')[0]}#t{n}"
+            usadas.add(u)
+            crudos.append({**x, "url": u})
+        filas = [f for f in (runner.normalizar(x, fuente, p["tipo_cambio"]) for x in crudos) if base.valido(f)]
+        if filas:
+            total += len(runner.guardar(db, filas))
+        db.upsert("rastreo", {"url": url, "dominio": dominio(url), "visto": datetime.now(timezone.utc).isoformat(), "avisos": len(filas)}, on_conflict="url")
+    return {"paginas": len(nuevas), "inmuebles": total}
+
+
+def ejecutar(db, p, por_sitio=None, max_sitios=None):
+    from .. import config
+    por_sitio = por_sitio or (30 if config.OPENAI_API_KEY else 15)
+    max_sitios = max_sitios or (60 if config.OPENAI_API_KEY else 25)
     vistos = {f["url"] for f in db.select_all("rastreo", select="url")}
     resumen = {"sitios": 0, "paginas_nuevas": 0, "inmuebles": 0}
     for sitio in sitios(db)[:max_sitios]:
@@ -87,4 +116,9 @@ def ejecutar(db, p, por_sitio=15, max_sitios=25):
             db.upsert("rastreo", {"url": url, "dominio": dominio(url), "visto": datetime.now(timezone.utc).isoformat(), "avisos": len(filas)}, on_conflict="url")
             vistos.add(url)
             resumen["paginas_nuevas"] += 1
+    for fuente, sitemap in SITEMAPS_PORTALES.items():
+        try:
+            resumen[fuente] = portal_completo(db, p, fuente, sitemap)
+        except Exception as e:
+            resumen[fuente] = f"error: {str(e)[:120]}"
     return resumen
