@@ -81,8 +81,13 @@ def verificar(db, limite=150, parte=0, partes=1):
             db.update("sitios", {"estado": "descartado", "motivo": "no se pudo abrir", "revisado": ahora}, dominio=f"eq.{s['dominio']}")
             hechos["descartado"] += 1
             continue
+        senales = len(SENALES.findall(texto))
         if s["origen"] == "usuario":
             ok, motivo, ciudad = True, "agregado por ti", s.get("ciudad")
+        elif senales >= 15:
+            ok, motivo, ciudad = True, "muchas señales de proyecto inmobiliario", s.get("ciudad")
+        elif senales <= 2:
+            ok, motivo, ciudad = False, "sin señales de proyecto inmobiliario", s.get("ciudad")
         elif llm.disponible():
             try:
                 r = llm.pedir_json(PROMPT.format(dominio=s["dominio"], texto=texto[:4000]))

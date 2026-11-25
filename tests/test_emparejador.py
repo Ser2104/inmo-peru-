@@ -20,14 +20,18 @@ def test_evalua_y_no_repite(monkeypatch):
 
     def falso(prompt, **k):
         llamadas.append(prompt)
+        if "lista JSON de 30 a 60" in prompt:
+            return ["camioneta", "vehiculo"]
         return [{"id": ids["a"], "encaja": True, "puntaje": 90, "razon": "Piden alquiler de camionetas", "que_piden": "3 camionetas 6 meses"},
                 {"id": ids["b"], "encaja": False, "puntaje": 5, "razon": "Quieren comprar, no alquilar"}]
     monkeypatch.setattr(llm, "disponible", lambda: True)
     monkeypatch.setattr(llm, "pedir_json", falso)
-    assert emparejador.evaluar(db) == {"evaluadas": 2, "encajan": 1}
-    assert emparejador.evaluar(db)["evaluadas"] == 0 and len(llamadas) == 1
+    db.upsert("oportunidades", {"clave": "c", "titulo": "Compra de útiles de oficina", "departamento": "Lima"})
+    r = emparejador.evaluar(db)
+    assert r == {"evaluadas_con_ia": 2, "descartadas_sin_ia": 1, "encajan": 1}
+    assert emparejador.evaluar(db)["evaluadas_con_ia"] == 0 and len(llamadas) == 2
     db.t["perfiles"][0]["version"] = 2
-    assert emparejador.evaluar(db)["evaluadas"] == 2
+    assert emparejador.evaluar(db)["evaluadas_con_ia"] == 2
 
 
 def test_bases_corrigen_y_ponen_fecha(monkeypatch):

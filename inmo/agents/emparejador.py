@@ -3,6 +3,7 @@ from datetime import date, datetime, timezone
 
 from .. import llm
 from ..collectors import base
+from ..valoracion import norm
 
 LOTE = 20
 
@@ -55,6 +56,24 @@ def activos_texto(p):
     return "; ".join(f"{a.get('cantidad') or 1} × {a.get('que')}{(' (' + a['detalle'] + ')') if a.get('detalle') else ''}" for a in (p.get("activos") or [])) or "ver descripción"
 
 
+PROMPT_PALABRAS = """Un proveedor peruano tiene esto: \"\"\"{perfil}\"\"\" Equipos: {activos}.
+Escribe una lista JSON de 30 a 60 palabras o frases cortas (en minúsculas, sin tildes) que aparecerían en una convocatoria
+que él podría ganar: sinónimos, tipos de vehículo o equipo, servicios y formas en que el Estado lo escribe (ej. "unidad vehicular").
+Sé amplio: es mejor incluir de más que dejar fuera una convocatoria buena."""
+
+
+def palabras(db, p):
+    clave = f"palabras_perfil_{p['id']}_{p['version']}"
+    guardado = db.select("parametros", select="valor", clave=f"eq.{clave}")
+    if guardado:
+        return guardado[0]["valor"]
+    lista = llm.pedir_json(PROMPT_PALABRAS.format(perfil=p["descripcion"], activos=activos_texto(p)))
+    lista = [norm(str(x)) for x in (lista if isinstance(lista, list) else []) if str(x).strip()]
+    if lista:
+        db.upsert("parametros", {"clave": clave, "valor": lista}, on_conflict="clave")
+    return lista
+
+
 def perfil(db, id_="principal"):
     filas = db.select("perfiles", select="*", id=f"eq.{id_}")
     return filas[0] if filas else None
@@ -75,6 +94,19 @@ def evaluar(db, maximo=4000):
         return {"omitido": "sin perfil o sin IA"}
     zona = f"Solo trabaja en: {', '.join(p['departamentos'])}." if p.get("departamentos") else "Trabaja en todo el Perú."
     lista = pendientes(db, p)[:maximo]
+    try:
+        claves = palabras(db, p)
+    except RuntimeError:
+        claves = []
+    if claves:
+        texto_de = lambda o: norm(f"{o.get('titulo') or ''} {o.get('descripcion') or ''} {items_texto(o)}")
+        fuera = [o for o in lista if not any(k in texto_de(o) for k in claves)]
+        lista = [o for o in lista if o not in fuera]
+        ahora = datetime.now(timezone.utc).isoformat()
+        filas = [{"oportunidad_id": o["id"], "perfil_id": p["id"], "version": p["version"], "encaja": False, "puntaje": 0,
+                  "razon": "No menciona nada relacionado con lo que ofreces.", "que_piden": "", "bases_leidas": False, "actualizado": ahora} for o in fuera]
+        for k in range(0, len(filas), 500):
+            db.upsert("coincidencias", filas[k:k + 500], on_conflict="oportunidad_id,perfil_id")
     encajan = 0
     for k in range(0, len(lista), LOTE):
         lote = lista[k:k + LOTE]
@@ -97,7 +129,7 @@ def evaluar(db, maximo=4000):
                           "que_piden": str(d.get("que_piden") or "")[:160], "bases_leidas": False,
                           "actualizado": datetime.now(timezone.utc).isoformat()})
         db.upsert("coincidencias", filas, on_conflict="oportunidad_id,perfil_id")
-    return {"evaluadas": len(lista), "encajan": encajan}
+    return {"evaluadas_con_ia": len(lista), "descartadas_sin_ia": len(fuera) if claves else 0, "encajan": encajan}
 
 
 def leer_bases(db, descargar=None, limite=60):

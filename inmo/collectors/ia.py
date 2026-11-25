@@ -1,3 +1,4 @@
+import re
 import json
 from urllib.parse import urljoin
 
@@ -20,6 +21,24 @@ CONTENIDO:
 {contenido}"""
 
 
+PRECIO = re.compile(r"(S/\.?\s?\d|US\$\s?\d|USD\s?\d|\$\s?\d{2,}|\d[\d.,]*\s?(soles|d[oó]lares))", re.I)
+DATO = re.compile(r"(S/\.?\s?\d|US\$\s?\d|USD\s?\d|\$\s?\d{2,}|\d+\s?m(²|2)\b|\d\s?dorm|\d\s?hab|precio|desde)", re.I)
+ENLACE_UTIL = re.compile(r"(\d{3,}|proyecto|depa|departament|casa|lote|terreno|venta|inmueble|flat|tipolog|unidad|modelo)", re.I)
+VENTANA, TOPE = 700, 14000
+
+
+def enfocar(texto, tope=TOPE):
+    tramos = []
+    for m in DATO.finditer(texto):
+        a, b = max(0, m.start() - VENTANA), m.end() + VENTANA
+        if tramos and a <= tramos[-1][1]:
+            tramos[-1][1] = max(tramos[-1][1], b)
+        else:
+            tramos.append([a, b])
+    salida = " … ".join(texto[a:b] for a, b in tramos)
+    return salida[:tope]
+
+
 def _reducir(html, base_url, limite=45000):
     if html.startswith("<pdf>"):
         return " ".join(html[5:].split())[:limite]
@@ -27,7 +46,8 @@ def _reducir(html, base_url, limite=45000):
     for e in sopa(["script", "style", "noscript", "svg", "iframe", "header", "footer"]):
         e.decompose()
     for a in sopa.find_all("a", href=True):
-        a.insert_after(f" [{urljoin(base_url, a['href'])}] ")
+        if ENLACE_UTIL.search(a["href"]):
+            a.insert_after(f" [{urljoin(base_url, a['href'])}] ")
     texto = " ".join(sopa.get_text(" ", strip=True).split())
     return texto[:limite]
 
@@ -73,13 +93,12 @@ def extraer(html, url):
     items = [] if html.startswith("<pdf>") else json_ld(html, url)
     if items or not llm.disponible():
         return items
-    contenido = _reducir(html, url, 200000)
-    salida = []
-    for i in range(0, max(1, len(contenido)), 45000):
-        datos = llm.pedir_json(PROMPT.format(url=url, contenido=contenido[i:i + 45000]))
-        salida += [d for d in (datos if isinstance(datos, list) else datos.get("inmuebles", [])) if isinstance(d, dict)]
-        if i >= 135000:
-            break
+    texto = _reducir(html, url, 300000)
+    if not PRECIO.search(texto):
+        return []
+    contenido = enfocar(texto)
+    datos = llm.pedir_json(PROMPT.format(url=url, contenido=contenido))
+    salida = [d for d in (datos if isinstance(datos, list) else datos.get("inmuebles", [])) if isinstance(d, dict)]
     for d in salida:
         if not d.get("url") or not str(d["url"]).startswith("http"):
             d["url"] = f"{url}#{d.get('titulo') or ''}-{d.get('precio') or ''}-{d.get('area_m2') or ''}"
