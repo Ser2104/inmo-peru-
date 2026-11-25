@@ -1,16 +1,18 @@
-import json
+from collections import Counter
 from datetime import date
 from inmo.agents import oportunidades as o
 
-hoy = date.today()
-r = o.Navegador().get(o.ARCHIVO.format(y=hoy.year, m=hoy.month))
-print("estado:", r.status_code, "bytes:", len(r.content), "inicio:", r.content[:4])
-n = abiertas = 0
+hoy = date.today().isoformat()
+r = o.Navegador().get(o.ARCHIVO.format(y=date.today().year, m=date.today().month))
+c, fin = Counter(), Counter()
 for paquete in o.paquetes(r.content):
     for rel in o.releases(paquete):
-        n += 1
-        if o.abierta(rel, hoy.isoformat()):
-            abiertas += 1
-            if abiertas <= 2:
-                print("ejemplo:", json.dumps({k: rel.get(k) for k in ("ocid", "date", "tender", "parties")}, ensure_ascii=False)[:1500])
-print("releases:", n, "abiertas:", abiertas)
+        t = rel.get("tender") or {}
+        estados = ",".join(sorted({str(i.get("statusDetails")) for i in t.get("items") or []}))[:40]
+        aw = ",".join(sorted({str(a.get("status")) for a in rel.get("awards") or []}))
+        f = ((t.get("tenderPeriod") or {}).get("endDate") or "")[:10]
+        c[(t.get("procurementMethodDetails"), t.get("status"), estados, aw)] += 1
+        fin["futuro" if f >= hoy else "pasado" if f else "sin_fecha"] += 1
+for k, v in c.most_common(25):
+    print("conteo:", v, k)
+print("fechas:", fin)
