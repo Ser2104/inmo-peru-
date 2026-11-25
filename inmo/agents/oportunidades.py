@@ -134,6 +134,7 @@ def releases(paquete):
 
 
 DIAS_SIN_FECHA = 12
+DIAS_TRAS_CONSULTAS = 7
 
 
 def abierta(rel, hoy):
@@ -144,9 +145,9 @@ def abierta(rel, hoy):
     if "CONVOCADO" not in estados:
         return False
     publicada = (t.get("datePublished") or rel.get("date") or "")[:10]
-    fin = ((t.get("tenderPeriod") or {}).get("endDate") or "")[:10]
-    if fin and fin >= hoy:
-        return True
+    consultas = ((t.get("enquiryPeriod") or {}).get("endDate") or "")[:10]
+    if consultas:
+        return consultas >= (date.fromisoformat(hoy) - timedelta(days=DIAS_TRAS_CONSULTAS)).isoformat()
     return publicada >= (date.fromisoformat(hoy) - timedelta(days=DIAS_SIN_FECHA)).isoformat()
 
 
