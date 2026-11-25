@@ -34,6 +34,11 @@ Devuelve una lista JSON (máximo 20) de objetos con: titulo (qué piden), descri
 url (página del anuncio), departamento, provincia, distrito, monto (número o null), moneda (USD|PEN|null), fecha_limite (AAAA-MM-DD o null),
 telefono, correo. Solo pedidos reales de empresas o instituciones que necesiten contratar un servicio, alquilar equipo o comprar algo. No inventes datos."""
 BUSQUEDAS = [
+    "requerimientos de contratos menores (iguales o menores a 8 UIT) que publican municipalidades, gobiernos regionales, universidades y hospitales para que proveedores coticen bienes o servicios",
+    "convocatorias de núcleos ejecutores de FONCODES, Agro Rural, juntas de usuarios de riego y proyectos especiales que buscan proveedores de materiales, maquinaria o transporte",
+    "convocatorias de Petroperú, Electroperú, EGASA, SEAL, SEDAPAR, Sedapal y otras empresas públicas para proveedores de bienes y servicios",
+    "licitaciones de UNOPS, PNUD, UNICEF, FAO y otras agencias internacionales en Perú para proveedores locales",
+    "obras por impuestos y empresas privadas que buscan contratistas o subcontratistas de obra, movimiento de tierras o transporte",
     "empresas mineras, constructoras y agroindustrias que buscan proveedores o alquiler de maquinaria pesada, volquetes y camiones",
     "convocatorias de empresas privadas que requieren servicios de taller mecánico, mantenimiento de flota, soldadura o metalmecánica",
     "empresas que solicitan proveedores de madera, aserradero, carpintería o encofrado",
@@ -201,11 +206,47 @@ def web(db, p, departamentos=None):
     return {"web": hechas}
 
 
+BANCO_MUNDIAL = "https://search.worldbank.org/api/v2/procnotices"
+
+
+def banco_mundial(db, p, http=None):
+    http = http or httpx
+    r = http.get(BANCO_MUNDIAL, params={"format": "json", "countryshortname_exact": "Peru", "rows": 100, "srt": "submission_date", "order": "desc", "fl": "*"}, timeout=60)
+    r.raise_for_status()
+    datos = r.json().get("procnotices") or []
+    hoy = date.today().isoformat()
+    filas = []
+    for x in datos.values() if isinstance(datos, dict) else datos:
+        limite = str(x.get("submission_deadline_date") or "")[:10]
+        if not limite or limite < hoy:
+            continue
+        titulo = (x.get("bid_description") or x.get("project_name") or "")[:300]
+        lugar, punto = _lugar([x.get("contact_city"), x.get("project_name")])
+        if not punto:
+            lugar, punto = _lugar(["Lima"])
+        filas.append({
+            "clave": f"bm-{x.get('id')}", "fuente": "banco_mundial", "titulo": titulo,
+            "descripcion": re.sub(r"<[^>]+>", " ", str(x.get("notice_text") or ""))[:1000], "rubro": rubro(f"{titulo} {x.get('project_name') or ''}"),
+            "entidad": x.get("contact_organization") or x.get("borrower"), "telefono": x.get("contact_phone_no"), "correo": x.get("contact_email"),
+            "departamento": lugar.get("departamento"), "provincia": lugar.get("provincia"), "distrito": lugar.get("distrito"),
+            "lat": punto[0] if punto else None, "lng": punto[1] if punto else None, "monto_usd": None,
+            "fecha_publicacion": str(x.get("noticedate") or x.get("submission_date") or "")[:10] or None, "fecha_limite": limite,
+            "url": f"https://projects.worldbank.org/en/projects-operations/procurement-detail/{x.get('id')}",
+        })
+    if filas:
+        db.upsert("oportunidades", filas, on_conflict="clave")
+    return {"vigentes": len(filas), "leidas": len(datos)}
+
+
 def ejecutar(db, p, con_web=True):
     try:
         r = {"seace": seace(db, p)}
     except Exception as e:
         r = {"seace": f"no disponible: {str(e)[:120]}"}
     if con_web:
+        try:
+            r["banco_mundial"] = banco_mundial(db, p)
+        except Exception as e:
+            r["banco_mundial"] = f"no disponible: {str(e)[:120]}"
         r["web"] = web(db, p)
     return r

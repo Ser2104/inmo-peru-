@@ -47,3 +47,15 @@ def test_seace_solo_guarda_convocatorias_abiertas():
     o = db.t["oportunidades"][0]
     assert o["rubro"] == "maquinaria" and o["distrito"] == "Cayma" and abs(o["lat"] + 16.3625) < 0.01
     assert round(o["monto_usd"]) == 100000 and o["telefono"] == "054-123456" and o["url"].startswith("https://")
+
+
+def test_banco_mundial_solo_vigentes():
+    futuro = (date.today() + timedelta(days=10)).isoformat()
+    datos = {"procnotices": [
+        {"id": "OP1", "bid_description": "Alquiler de camiones cisterna", "project_name": "Agua para Arequipa", "submission_deadline_date": futuro + "T00:00:00Z", "contact_city": "Arequipa"},
+        {"id": "OP2", "bid_description": "Consultoría", "submission_deadline_date": "2020-01-01T00:00:00Z"}]}
+    http = type("H", (), {"get": lambda self, *a, **k: type("R", (), {"raise_for_status": lambda s: None, "json": lambda s: datos})()})()
+    db = FakeDB()
+    assert oportunidades.banco_mundial(db, {"tipo_cambio": 3.45}, http=http)["vigentes"] == 1
+    o = db.t["oportunidades"][0]
+    assert o["rubro"] == "camiones y transporte" and o["departamento"] == "Arequipa" and o["fecha_limite"] == futuro
