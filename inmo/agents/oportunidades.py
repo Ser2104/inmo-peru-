@@ -68,13 +68,19 @@ def desde_release(rel, tc):
     contacto = comprador.get("contactPoint") or {}
     valor = tender.get("value") or {}
     monto = valor.get("amount")
-    titulo = (tender.get("title") or tender.get("description") or "")[:300]
-    descripcion = (tender.get("description") or "")[:1000]
+    codigo = tender.get("title") or ""
+    descripcion = (tender.get("description") or "").strip("¿? ")[:1000]
+    titulo = (descripcion or codigo)[:300]
+    clases = " ".join(str((i.get("classification") or {}).get("description") or "") for i in tender.get("items") or [])
     lugar, punto = _lugar([direccion.get("locality"), direccion.get("region"), direccion.get("streetAddress"), comprador.get("name")])
+    if not lugar.get("distrito"):
+        lugar2, punto2 = _lugar(re.findall(r"(?:DISTRITO|PROVINCIA|DEPARTAMENTO|REGI[OÓ]N) (?:DE )?([A-ZÁÉÍÓÚÑ ]+?)(?:[,.;]| PROVINCIA| DEPARTAMENTO|$)", descripcion.upper())[::-1] + re.findall(r"(?:DISTRITAL|PROVINCIAL|REGIONAL|GOBIERNO REGIONAL) DE ([A-ZÁÉÍÓÚÑ ]+)", str(comprador.get("name") or "").upper()))
+        if lugar2.get("distrito") or not lugar.get("departamento"):
+            lugar, punto = lugar2, punto2
     docs = [d.get("url") for d in tender.get("documents") or [] if str(d.get("url") or "").startswith("http")]
     return {
         "clave": rel.get("ocid") or rel.get("id"), "fuente": "seace",
-        "titulo": titulo, "descripcion": descripcion, "rubro": rubro(f"{titulo} {descripcion}"),
+        "titulo": titulo, "descripcion": descripcion, "rubro": rubro(f"{titulo} {clases}"),
         "categoria": {"goods": "bienes", "services": "servicios", "works": "obras"}.get(tender.get("mainProcurementCategory"), tender.get("mainProcurementCategory")),
         "entidad": comprador.get("name"), "telefono": contacto.get("telephone"), "correo": contacto.get("email"),
         "web": contacto.get("url") or comprador.get("url"),
@@ -84,7 +90,7 @@ def desde_release(rel, tc):
         "fecha_publicacion": (tender.get("datePublished") or rel.get("date") or "")[:10] or None,
         "fecha_limite": ((tender.get("tenderPeriod") or {}).get("endDate") or "")[:10] or None,
         "url": docs[0] if docs else f"https://contratacionesabiertas.oece.gob.pe/proceso/{rel.get('ocid')}",
-        "metodo": tender.get("procurementMethodDetails"),
+        "metodo": " · ".join(x for x in (tender.get("procurementMethodDetails"), codigo) if x),
     }
 
 
@@ -120,6 +126,12 @@ def releases(paquete):
 
 def abierta(rel, hoy):
     t = rel.get("tender") or {}
+    if t.get("procurementMethod") == "direct" or t.get("status") in ("complete", "cancelled", "unsuccessful", "withdrawn"):
+        return False
+    if any(a.get("status") in ("active", "pending") for a in rel.get("awards") or []):
+        return False
+    if any(str(i.get("statusDetails") or "").upper() in ("ADJUDICADO", "DESIERTO", "CANCELADO", "NULO") for i in t.get("items") or []):
+        return False
     fin = ((t.get("tenderPeriod") or {}).get("endDate") or "")[:10]
     if fin:
         return fin >= hoy
