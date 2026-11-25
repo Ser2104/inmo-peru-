@@ -1,3 +1,4 @@
+import random
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -128,7 +129,13 @@ def web(db, p, departamentos=None):
     if not llm.disponible():
         return {"omitido": "sin IA"}
     hechas = 0
-    for dep in departamentos or config.DEPARTAMENTOS:
+    if not departamentos:
+        conteo = {d: 0 for d in config.DEPARTAMENTOS}
+        for f in db.select_all("oportunidades", select="departamento", fuente="eq.web"):
+            if f.get("departamento") in conteo:
+                conteo[f["departamento"]] += 1
+        departamentos = sorted(conteo, key=lambda d: (conteo[d], random.random()))[:8]
+    for dep in departamentos:
         for que in BUSQUEDAS:
             try:
                 datos = llm.pedir_json(PROMPT.format(que=que, lugar=f"{dep}, Perú"), buscar=True)
@@ -156,7 +163,10 @@ def web(db, p, departamentos=None):
 
 
 def ejecutar(db, p, con_web=True):
-    r = {"seace": seace(db, p)}
+    try:
+        r = {"seace": seace(db, p)}
+    except Exception as e:
+        r = {"seace": f"no disponible: {str(e)[:120]}"}
     if con_web:
         r["web"] = web(db, p)
     return r

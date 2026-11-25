@@ -103,8 +103,6 @@ def main():
     if a.tarea in ("ciclo", "verificar"):
         paso(db, "verificador", lambda: explorador.verificar(db, p))
         paso(db, "respuestas", lambda: explorador.procesar_respuestas(db, p))
-    if a.tarea == "ciclo":
-        paso(db, "seace", lambda: oportunidades.seace(db, p))
     if a.tarea in ("oportunidades", "completo"):
         paso(db, "oportunidades", lambda: oportunidades.ejecutar(db, p, con_web="seace" not in a.fuentes))
     if a.tarea in ("concesiones", "completo"):
