@@ -19,9 +19,13 @@ def _alarma(*_):
     raise Tiempo(f"superó {config.MINUTOS_POR_PASO} minutos")
 
 
+ALARMA = hasattr(signal, "SIGALRM")
+
+
 def paso(db, nombre, funcion):
-    signal.signal(signal.SIGALRM, _alarma)
-    signal.alarm(config.MINUTOS_POR_PASO * 60)
+    if ALARMA:
+        signal.signal(signal.SIGALRM, _alarma)
+        signal.alarm(config.MINUTOS_POR_PASO * 60)
     try:
         r = funcion()
         db.registrar(nombre, True, r)
@@ -34,7 +38,8 @@ def paso(db, nombre, funcion):
             pass
         print(nombre, "ERROR", e, file=sys.stderr)
     finally:
-        signal.alarm(0)
+        if ALARMA:
+            signal.alarm(0)
 
 
 def recolectar(db, p, completo):
