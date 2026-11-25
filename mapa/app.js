@@ -322,6 +322,7 @@ $("f-dep").onchange = () => { $("f-dist").value = ""; opciones(); dibujar(); };
 function modos() {
   $("modos").hidden = estado.capa !== "inversion";
   $("modos-op").hidden = estado.capa !== "oportunidades";
+  $("b-paramí").classList.toggle("activo", estado.paraMi);
   $("modos").querySelectorAll(".btn").forEach((b) => b.classList.toggle("activo", b.dataset.modo === $("f-estrategia").value));
 }
 $("modos").querySelectorAll(".btn").forEach((b) => b.onclick = () => {
