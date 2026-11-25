@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 jobs:
   leer:
-    runs-on: self-hosted
+    runs-on: [self-hosted, arequipa]
     timeout-minutes: 120
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
