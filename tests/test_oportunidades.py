@@ -42,8 +42,10 @@ def test_seace_solo_guarda_convocatorias_abiertas():
     cerrada["tender"]["items"] = [{"statusDetails": "ADJUDICADO"}]
     paquete = {"records": [{"ocid": "a", "compiledRelease": release(1)}, {"ocid": "b", "compiledRelease": release(2, titulo="Adquisición de madera aserrada")},
                            {"ocid": "c", "compiledRelease": cerrada}]}
+    db.upsert("oportunidades", {"clave": "ya-cerrada", "fuente": "seace"})
     r = oportunidades.seace(db, {"tipo_cambio": 3.45}, http=Http(zip_de(paquete)))
-    assert r["abiertas"] == 2 and r["nuevas"] == 2
+    assert r["abiertas"] == 2 and r["nuevas"] == 2 and r["cerradas_quitadas"] == 1
+    assert "ya-cerrada" not in {o["clave"] for o in db.t["oportunidades"]}
     o = db.t["oportunidades"][0]
     assert o["rubro"] == "maquinaria" and o["distrito"] == "Cayma" and abs(o["lat"] + 16.3625) < 0.01
     assert round(o["monto_usd"]) == 100000 and o["telefono"] == "054-123456" and o["url"].startswith("https://")

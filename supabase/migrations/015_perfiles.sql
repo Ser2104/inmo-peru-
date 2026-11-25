@@ -47,6 +47,6 @@ select o.id, o.fuente, o.titulo, o.descripcion, o.rubro, o.categoria, o.metodo, 
        c.encaja, c.puntaje as puntaje_perfil, c.razon, c.que_piden, c.requisitos
 from oportunidades o
 left join coincidencias c on c.oportunidad_id = o.id and c.perfil_id = 'principal'
-where o.lat is not null and coalesce(o.fecha_limite, o.fecha_publicacion + 30, (o.creado + interval '30 days')::date) >= current_date;
+where o.lat is not null and coalesce(o.fecha_limite, o.fecha_publicacion + 12, (o.creado + interval '12 days')::date) >= current_date;
 grant select on mapa_oportunidades to authenticated;
 revoke select on mapa_oportunidades from anon;

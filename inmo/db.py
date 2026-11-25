@@ -59,6 +59,9 @@ class DB:
                 salida += r.json()
         return salida
 
+    def delete(self, tabla, **filtros):
+        _con_reintentos(self.http.delete, f"/{tabla}", params=filtros)
+
     def update(self, tabla, valores, **filtros):
         _con_reintentos(self.http.patch, f"/{tabla}", params=filtros, content=json.dumps(valores, default=str))
 

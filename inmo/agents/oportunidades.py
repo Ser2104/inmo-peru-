@@ -129,6 +129,9 @@ def releases(paquete):
             yield x
 
 
+DIAS_SIN_FECHA = 12
+
+
 def abierta(rel, hoy):
     t = rel.get("tender") or {}
     if t.get("procurementMethod") == "direct" or rel.get("awards"):
@@ -137,7 +140,10 @@ def abierta(rel, hoy):
     if "CONVOCADO" not in estados:
         return False
     publicada = (t.get("datePublished") or rel.get("date") or "")[:10]
-    return publicada >= (date.fromisoformat(hoy) - timedelta(days=30)).isoformat()
+    fin = ((t.get("tenderPeriod") or {}).get("endDate") or "")[:10]
+    if fin and fin >= hoy:
+        return True
+    return publicada >= (date.fromisoformat(hoy) - timedelta(days=DIAS_SIN_FECHA)).isoformat()
 
 
 def seace(db, p, http=None):
@@ -149,6 +155,7 @@ def seace(db, p, http=None):
         periodos.append((anterior.year, anterior.month))
     vistos = {f["clave"] for f in db.select_all("oportunidades", select="clave", fuente="eq.seace")}
     resumen = {"leidas": 0, "abiertas": 0, "nuevas": 0}
+    abiertas = set()
     for y, m in periodos:
         r = http.get(ARCHIVO.format(y=y, m=m))
         r.raise_for_status()
@@ -166,6 +173,11 @@ def seace(db, p, http=None):
             db.upsert("oportunidades", lista[k:k + 500], on_conflict="clave")
         resumen["abiertas"] += len(lista)
         resumen["nuevas"] += sum(1 for f in lista if f["clave"] not in vistos)
+        abiertas.update(filas)
+    cerradas = [k for k in vistos if k not in abiertas]
+    for k in range(0, len(cerradas), 100):
+        db.delete("oportunidades", clave="in.(" + ",".join(f'"{c}"' for c in cerradas[k:k + 100]) + ")")
+    resumen["cerradas_quitadas"] = len(cerradas)
     return resumen
 
 

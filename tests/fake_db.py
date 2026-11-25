@@ -16,7 +16,7 @@ def _cumple(fila, campo, cond):
     if op == "lt":
         return v is not None and float(v) < float(val)
     if op == "in":
-        return str(v) in val.strip("()").split(",")
+        return str(v) in [x.strip('"') for x in val.strip("()").split(",")]
     if op in ("gte", "gt"):
         if v is None:
             return False
@@ -72,6 +72,9 @@ class FakeDB:
                 self.t[tabla].append(existente)
             salida.append(dict(existente))
         return salida
+
+    def delete(self, tabla, **filtros):
+        self.t[tabla] = [f for f in self.t[tabla] if not all(_cumple(f, k, c) for k, c in filtros.items())]
 
     def update(self, tabla, valores, **filtros):
         for f in self.t[tabla]:
