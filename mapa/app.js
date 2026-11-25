@@ -6,7 +6,7 @@ const COLOR = { verde: "#1a7f37", ambar: "#c78a00", rojo: "#c62828", gris: "#6b7
 const DEMO = new URLSearchParams(location.search).has("demo");
 
 const estado = { capa: "inversion", horizonte: "total", veredictos: new Set(["Comprar", "Negociar", "Revisar a mano"]), zonas: false };
-let inmuebles = [], arbitrajes = [], negocios = [], sb = null;
+let inmuebles = [], arbitrajes = [], negocios = [], oportunidades = [], sb = null;
 
 const PERU = L.latLngBounds([-18.6, -81.6], [0.2, -68.4]);
 const mapa = L.map("mapa", { zoomControl: false, maxBounds: PERU.pad(0.15), maxBoundsViscosity: 1, minZoom: 5 }).fitBounds(PERU);
@@ -40,18 +40,24 @@ function color(p) {
   return p >= 7.5 ? COLOR.verde : p >= 6 ? COLOR.ambar : COLOR.rojo;
 }
 
+const dias = (f) => f ? Math.ceil((new Date(f + "T23:59:00") - new Date()) / 864e5) : null;
+const colorOportunidad = (i) => { const d = dias(i.fecha_limite); return d == null ? COLOR.gris : d > 7 ? COLOR.verde : d >= 2 ? COLOR.ambar : COLOR.rojo; };
 const COLOR_VEREDICTO = { "Atractivo": COLOR.verde, "Falta información": COLOR.gris, "Fuera de escala": COLOR.gris, "Comprar": COLOR.verde, "Buena oportunidad": COLOR.verde, "Negociar": COLOR.ambar, "Evaluar": COLOR.ambar, "Revisar a mano": COLOR.ambar };
 const nivelDe = (i) => [COLOR.rojo, COLOR.ambar, COLOR.verde].indexOf(colorDe(i));
-const colorDe = (i) => estado.horizonte === "total" || estado.capa !== "inversion" ? (COLOR_VEREDICTO[i.veredicto] ?? COLOR.rojo) : color(puntaje(i));
+const colorDe = (i) => estado.capa === "oportunidades" ? colorOportunidad(i) : estado.horizonte === "total" || estado.capa !== "inversion" ? (COLOR_VEREDICTO[i.veredicto] ?? COLOR.rojo) : color(puntaje(i));
 
 function icono(i) {
-  const letra = estado.capa === "negocios" ? { traspaso: "T", local: "C", estado: "E" }[i.tipo] : estado.capa === "arbitraje" ? "A" : i.estado === "remate" ? "R" : i.estrategia === "temporal" ? "D" : i.estado === "preventa" || i.estado === "en_planos" ? "P" : "";
+  const letra = estado.capa === "oportunidades" ? (i.fuente === "seace" ? "E" : "P") : estado.capa === "negocios" ? { traspaso: "T", local: "C", estado: "E" }[i.tipo] : estado.capa === "arbitraje" ? "A" : i.estado === "remate" ? "R" : i.estrategia === "temporal" ? "D" : i.estado === "preventa" || i.estado === "en_planos" ? "P" : "";
   return L.divIcon({ className: "", html: `<div class="punto" style="background:${colorDe(i)}">${letra}</div>`, iconSize: [18, 18] });
 }
 
 function filtrados() {
   const dep = $("f-dep").value, dist = $("f-dist").value, min = +$("f-puntaje").value;
   const precio = +$("f-precio").value || Infinity;
+  if (estado.capa === "oportunidades") {
+    const r = $("f-rubro").value;
+    return oportunidades.filter((i) => (!dep || i.departamento === dep) && (!dist || i.distrito === dist) && (!r || i.rubro === r) && (i.monto_usd ?? 0) <= precio);
+  }
   if (estado.capa === "negocios") {
     const t = $("f-negocio").value;
     return negocios.filter((i) => (!dep || i.departamento === dep) && (!dist || i.distrito === dist) && (!t || i.tipo === t) && (i.puntaje ?? 0) >= min && (i.inversion_usd ?? 0) <= precio);
@@ -70,10 +76,12 @@ function dibujar() {
   const lista = filtrados();
   grupo.clearLayers();
   grupo.addLayers(lista.map((i) => L.marker([i.lat, i.lng], { icon: icono(i), nivel: Math.max(0, nivelDe(i)) }).on("click", () => abrir(i))));
-  $("contador").textContent = `${lista.length.toLocaleString("es-PE")} ${estado.capa === "negocios" ? "negocios" : "inmuebles"}`;
+  $("contador").textContent = `${lista.length.toLocaleString("es-PE")} ${{ negocios: "negocios", oportunidades: "oportunidades" }[estado.capa] || "inmuebles"}`;
   dibujarZonas(lista);
   dibujarLista(lista);
-  $("leyenda").innerHTML = estado.capa === "negocios"
+  $("leyenda").innerHTML = estado.capa === "oportunidades"
+    ? `<span style="background:${COLOR.verde}"></span>Más de 7 días para postular<br><span style="background:${COLOR.ambar}"></span>2 a 7 días<br><span style="background:${COLOR.rojo}"></span>Vence ya<br><span style="background:${COLOR.gris}"></span>Sin fecha límite<br>E = Estado · P = empresa privada`
+    : estado.capa === "negocios"
     ? `<span style="background:${COLOR.verde}"></span>Atractivo<br><span style="background:${COLOR.ambar}"></span>Negociar / revisar<br><span style="background:${COLOR.rojo}"></span>Descartar<br><span style="background:${COLOR.gris}"></span>Falta información<br>T = traspaso · C = concesión · E = Estado`
     : estado.capa === "arbitraje"
     ? `<span style="background:${COLOR.verde}"></span>Buena oportunidad<br><span style="background:${COLOR.ambar}"></span>Evaluar<br><span style="background:${COLOR.rojo}"></span>No conviene`
@@ -98,9 +106,10 @@ function dibujarZonas(lista) {
 }
 
 function dibujarLista(lista) {
-  const top = [...lista].sort((a, b) => (puntaje(b) ?? 0) - (puntaje(a) ?? 0)).slice(0, 30);
-  $("items").innerHTML = top.map((i, n) => `<div class="item" data-n="${n}"><b style="color:${colorDe(i)}">${(puntaje(i) ?? 0).toFixed(1)}</b> · ${esc(i.titulo || i.nombre || i.tipo || "Inmueble")}<br>
-    <span class="sub">${esc(i.distrito || "")}, ${esc(i.departamento || "")} · ${estado.capa === "negocios" ? esc(i.veredicto) + " · " + usd(i.inversion_usd) : estado.capa === "arbitraje" ? usd(i.utilidad_mensual_usd) + "/mes de ganancia" : usd(i.precio_usd)}</span></div>`).join("") || '<p class="sub">No hay inmuebles con estos filtros.</p>';
+  const op = estado.capa === "oportunidades";
+  const top = [...lista].sort((a, b) => op ? (b.monto_usd ?? 0) - (a.monto_usd ?? 0) : (puntaje(b) ?? 0) - (puntaje(a) ?? 0)).slice(0, 30);
+  $("items").innerHTML = top.map((i, n) => `<div class="item" data-n="${n}"><b style="color:${colorDe(i)}">${op ? "💼" : (puntaje(i) ?? 0).toFixed(1)}</b> · ${esc((i.titulo || i.nombre || i.tipo || "Inmueble").slice(0, 120))}<br>
+    <span class="sub">${esc(i.distrito || "")}, ${esc(i.departamento || "")} · ${estado.capa === "oportunidades" ? esc(i.rubro) + " · " + (i.monto_usd ? usd(i.monto_usd) : "monto no indicado") + (i.fecha_limite ? " · vence " + i.fecha_limite : "") : estado.capa === "negocios" ? esc(i.veredicto) + " · " + usd(i.inversion_usd) : estado.capa === "arbitraje" ? usd(i.utilidad_mensual_usd) + "/mes de ganancia" : usd(i.precio_usd)}</span></div>`).join("") || '<p class="sub">No hay inmuebles con estos filtros.</p>';
   $("items").querySelectorAll(".item").forEach((el) => el.onclick = () => { const i = top[+el.dataset.n]; mapa.setView([i.lat, i.lng], 16); abrir(i); });
 }
 
@@ -137,6 +146,21 @@ async function abrir(i) {
   const p = $("contenido");
   const aprox = i.ubicacion_precision === "distrito" ? '<div class="aviso">📍 Ubicación aproximada: el aviso no trae dirección exacta, se muestra en su distrito.</div>' : "";
   const enlace = fuente(i, estado.capa === "negocios" ? mensajeNegocio(i) : null);
+  if (estado.capa === "oportunidades") {
+    const d = dias(i.fecha_limite);
+    p.innerHTML = `<h2>${esc(i.titulo)}</h2><p class="sub">${esc([i.rubro, i.categoria, i.metodo].filter(Boolean).join(" · "))}<br>${esc([i.distrito, i.provincia, i.departamento].filter(Boolean).join(", "))}</p>
+      <span class="veredicto" style="background:${colorOportunidad(i)}">${d == null ? "Sin fecha límite" : d < 0 ? "Vencida" : d === 0 ? "Vence hoy" : `Quedan ${d} días`}</span>
+      <div class="grid"><div class="dato"><small>Quién lo pide</small><b>${esc(i.entidad || "—")}</b></div>
+      <div class="dato"><small>Monto referencial</small><b>${usd(i.monto_usd)}</b></div>
+      <div class="dato"><small>Publicado</small><b>${esc(i.fecha_publicacion || "—")}</b></div>
+      <div class="dato"><small>Fecha límite</small><b>${esc(i.fecha_limite || "—")}</b></div></div>
+      <p>${esc(i.descripcion || "")}</p>
+      ${i.fuente === "seace" ? '<p class="sub">Compra del Estado (SEACE): para postular necesitas estar inscrito en el Registro Nacional de Proveedores (RNP) y presentar tu oferta en el SEACE antes de la fecha límite.</p>' : '<p class="sub">Pedido de una empresa privada encontrado en internet: confirma con ellos que siga vigente.</p>'}
+      ${i.correo ? `<p class="sub">Correo: <a href="mailto:${esc(i.correo)}">${esc(i.correo)}</a></p>` : ""}${i.web ? `<p class="sub">Web: <a href="${esc(i.web)}" target="_blank" rel="noopener">${esc(i.web)}</a></p>` : ""}
+      <div class="aviso">📍 Ubicación aproximada: se muestra en la ciudad de quien lo pide.</div>${fuente({ url: i.url, telefono: /^51\d{9}$/.test(i.telefono || "") ? i.telefono : null, entidad: i.entidad }, "Hola, vi su convocatoria y me interesa ofrecer el servicio. ¿Sigue vigente?")}${i.telefono && !/^51\d{9}$/.test(i.telefono) ? `<p class="sub">Teléfono: ${esc(i.telefono)}</p>` : ""}`;
+    abrirPanel("detalle");
+    return;
+  }
   if (estado.capa === "negocios") {
     const d = i.detalle || {}, tipo = { traspaso: "Traspaso de negocio", local: "Concesión de local", estado: "Proyecto del Estado" }[i.tipo];
     p.innerHTML = `<h2>${esc(i.nombre || tipo)}</h2><p class="sub">${esc([tipo, i.rubro, i.entidad, i.area_m2 ? Math.round(i.area_m2) + " m²" : ""].filter(Boolean).join(" · "))}<br>${esc([i.distrito, i.provincia, i.departamento].filter(Boolean).join(", "))}</p>
@@ -220,7 +244,7 @@ function abrirPanel(id) {
 }
 
 function opciones() {
-  const datos = { arbitraje: arbitrajes, negocios, inversion: inmuebles }[estado.capa];
+  const datos = { arbitraje: arbitrajes, negocios, oportunidades, inversion: inmuebles }[estado.capa];
   const dep = $("f-dep").value;
   const llenar = (sel, valores, primero) => {
     const actual = sel.value;
@@ -247,7 +271,7 @@ async function cargar() {
       const d = await (await fetch("demo.json")).json();
       inmuebles = d.inmuebles; arbitrajes = d.arbitrajes; negocios = d.negocios || [];
     } else {
-      [inmuebles, arbitrajes, negocios] = await Promise.all([todo("mapa_inmuebles"), todo("mapa_arbitraje"), todo("mapa_concesiones")]);
+      [inmuebles, arbitrajes, negocios, oportunidades] = await Promise.all([todo("mapa_inmuebles"), todo("mapa_arbitraje"), todo("mapa_concesiones"), todo("mapa_oportunidades")]);
     }
   } catch (e) {
     $("cargando").textContent = "No se pudo cargar: " + e.message;
@@ -272,7 +296,7 @@ $("b-zonas").onclick = () => {
   estado.zonas ? capaZonas.addTo(mapa) : mapa.removeLayer(capaZonas);
   dibujar();
 };
-const CAPAS = [["b-inversion", "inversion"], ["b-arbitraje", "arbitraje"], ["b-negocios", "negocios"]];
+const CAPAS = [["b-inversion", "inversion"], ["b-arbitraje", "arbitraje"], ["b-negocios", "negocios"], ["b-oportunidades", "oportunidades"]];
 for (const [id, capa] of CAPAS) {
   $(id).onclick = () => {
     estado.capa = capa;
@@ -303,7 +327,7 @@ $("modos").querySelectorAll(".btn").forEach((b) => b.onclick = () => {
   dibujar();
 });
 $("f-estrategia").addEventListener("change", modos);
-["f-dist", "f-negocio", "f-estrategia", "f-tipo", "f-estado", "f-precio"].forEach((id) => $(id).onchange = dibujar);
+["f-dist", "f-negocio", "f-rubro", "f-estrategia", "f-tipo", "f-estado", "f-precio"].forEach((id) => $(id).onchange = dibujar);
 $("f-puntaje").oninput = () => { $("v-puntaje").textContent = $("f-puntaje").value; dibujar(); };
 
 const mensaje = (p) => `Hola, soy asistente de Sergio Yacolca, de YACU Grupo Inmobiliario. Nos interesa invertir en ${p.nombre || "su proyecto"}${p.distrito ? " en " + p.distrito : ""}. ¿Nos podrían enviar precios, metrajes, fecha de entrega, forma de pago y mantenimiento de las unidades disponibles? Gracias.`;
