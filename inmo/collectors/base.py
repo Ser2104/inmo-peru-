@@ -217,3 +217,14 @@ def telefonos(texto):
 
 def valido(item):
     return bool(str(item.get("url") or "").startswith("http") and item.get("precio_usd") and item["precio_usd"] > 100 and item.get("operacion"))
+
+
+def antiguedad(texto):
+    t = (texto or "").lower()
+    m = re.search(r"(\d{1,3})\s*años?\s*de\s*antig|antig[uü]edad\s*:?\s*(\d{1,3})", t)
+    if m:
+        return int(m.group(1) or m.group(2))
+    m = re.search(r"(?:construid[oa]|edificad[oa]|del año)\s*(?:en\s*)?((?:19|20)\d\d)", t)
+    if m and 1900 < int(m.group(1)) <= datetime.now().year:
+        return datetime.now().year - int(m.group(1))
+    return 0 if re.search(r"a estrenar|\bestreno\b", t) else None

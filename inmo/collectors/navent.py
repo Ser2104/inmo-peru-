@@ -46,9 +46,21 @@ def coordenadas(html):
     return salida
 
 
+def antiguedades(html):
+    plano = html.replace('\\"', '"')
+    salida = {}
+    for trozo in plano.split('"postingId":"')[1:]:
+        id_ = re.match(r"(\d+)", trozo)
+        m = re.search(r'"CFT5":\{[^}]*?"value":"(\d{1,3})"', trozo.split('"postingId":"')[0])
+        if id_ and m:
+            salida.setdefault(id_.group(1), int(m.group(1)))
+    return salida
+
+
 def parsear(html, base_url, selectores=None):
     s = {**SELECTORES, **(selectores or {})}
     coords = coordenadas(html)
+    anios = antiguedades(html)
     sopa = BeautifulSoup(html, "html.parser")
     items, vistos = [], set()
     for card in sopa.select(s["tarjeta"]):
@@ -88,5 +100,7 @@ def parsear(html, base_url, selectores=None):
         id_ = re.search(r"-(\d{6,})(?:\.html)?$", url)
         if id_ and id_.group(1) in coords:
             item["lat"], item["lng"] = coords[id_.group(1)]
+        if id_ and id_.group(1) in anios:
+            item["antiguedad_anios"] = anios[id_.group(1)]
         items.append(item)
     return items

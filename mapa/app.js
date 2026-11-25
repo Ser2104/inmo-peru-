@@ -69,8 +69,9 @@ function filtrados() {
   if (estado.capa === "arbitraje") {
     return arbitrajes.filter((i) => (!dep || i.departamento === dep) && (!dist || i.distrito === dist) && (i.puntaje ?? 0) >= min);
   }
-  const est = $("f-estrategia").value, tipo = $("f-tipo").value, sit = $("f-estado").value, org = $("f-origen").value;
-  return inmuebles.filter((i) =>
+  const est = $("f-estrategia").value, tipo = $("f-tipo").value, sit = $("f-estado").value, org = $("f-origen").value, ant = $("f-antig").value;
+  const edad = (i) => !ant || (ant === "sin" ? i.antiguedad_anios == null : i.antiguedad_anios != null && (ant === "21" ? i.antiguedad_anios > 20 : i.antiguedad_anios <= +ant));
+  return inmuebles.filter((i) => edad(i) &&
     estado.veredictos.has(i.veredicto) && (!dep || i.departamento === dep) && (!dist || i.distrito === dist) &&
     (!est || i.estrategia === est) && (!org || origen(i) === org) && (!tipo || i.tipo === tipo) && (!sit || i.estado === sit) &&
     (i.precio_usd ?? 0) <= precio && (puntaje(i) ?? 0) >= min);
@@ -124,7 +125,7 @@ function barra(nombre, valor) {
 
 function encabezado(i, veredicto, colorV) {
   return `<h2>${esc(i.titulo || i.tipo || "Inmueble")}</h2>
-    <p class="sub">${esc([i.tipo, i.estado, i.dormitorios ? i.dormitorios + " dorm." : "", i.area_m2 ? Math.round(i.area_m2) + " m²" : ""].filter(Boolean).join(" · "))}<br>${esc(i.distrito || "")}, ${esc(i.provincia || "")}, ${esc(i.departamento || "")}</p>
+    <p class="sub">${esc([i.tipo, i.estado, i.dormitorios ? i.dormitorios + " dorm." : "", i.area_m2 ? Math.round(i.area_m2) + " m²" : "", i.antiguedad_anios == null ? "" : i.antiguedad_anios === 0 ? "a estrenar" : i.antiguedad_anios + " años de antigüedad"].filter(Boolean).join(" · "))}<br>${esc(i.distrito || "")}, ${esc(i.provincia || "")}, ${esc(i.departamento || "")}</p>
     <span class="veredicto" style="background:${colorV}">${esc(veredicto)}</span>`;
 }
 
@@ -171,7 +172,7 @@ async function abrir(i) {
   }
   if (estado.capa === "negocios") {
     const d = i.detalle || {}, tipo = { traspaso: "Traspaso de negocio", local: "Concesión de local", estado: "Proyecto del Estado" }[i.tipo];
-    p.innerHTML = `<h2>${esc(i.nombre || tipo)}</h2><p class="sub">${esc([tipo, i.rubro, i.entidad, i.area_m2 ? Math.round(i.area_m2) + " m²" : ""].filter(Boolean).join(" · "))}<br>${esc([i.distrito, i.provincia, i.departamento].filter(Boolean).join(", "))}</p>
+    p.innerHTML = `<h2>${esc(i.nombre || tipo)}</h2><p class="sub">${esc([tipo, i.rubro, i.entidad, i.area_m2 ? Math.round(i.area_m2) + " m²" : "", i.antiguedad_anios == null ? "" : i.antiguedad_anios === 0 ? "a estrenar" : i.antiguedad_anios + " años de antigüedad"].filter(Boolean).join(" · "))}<br>${esc([i.distrito, i.provincia, i.departamento].filter(Boolean).join(", "))}</p>
       <span class="veredicto" style="background:${COLOR_VEREDICTO[i.veredicto] ?? COLOR.rojo}">${esc(i.veredicto || "Sin analizar")}</span>
       <div class="grid"><div class="dato"><small>${i.tipo === "estado" ? "Inversión del proyecto" : "Inversión inicial"}</small><b>${usd(i.inversion_usd)}</b></div>
       <div class="dato"><small>Canon o alquiler</small><b>${i.canon_mensual_usd ? usd(i.canon_mensual_usd) + "/mes" : "—"}</b></div>
@@ -339,7 +340,7 @@ $("modos").querySelectorAll(".btn").forEach((b) => b.onclick = () => {
   dibujar();
 });
 $("f-estrategia").addEventListener("change", modos);
-["f-dist", "f-origen", "f-negocio", "f-rubro", "f-estrategia", "f-tipo", "f-estado", "f-precio"].forEach((id) => $(id).onchange = dibujar);
+["f-dist", "f-antig", "f-origen", "f-negocio", "f-rubro", "f-estrategia", "f-tipo", "f-estado", "f-precio"].forEach((id) => $(id).onchange = dibujar);
 $("f-puntaje").oninput = () => { $("v-puntaje").textContent = $("f-puntaje").value; dibujar(); };
 
 const mensaje = (p) => `Hola, soy asistente de Sergio Yacolca, de YACU Grupo Inmobiliario. Nos interesa invertir en ${p.nombre || "su proyecto"}${p.distrito ? " en " + p.distrito : ""}. ¿Nos podrían enviar precios, metrajes, fecha de entrega, forma de pago y mantenimiento de las unidades disponibles? Gracias.`;

@@ -8,7 +8,7 @@ from .. import ubigeo
 COLUMNAS = [
     "fuente", "url", "titulo", "tipo", "operacion", "estado", "departamento", "provincia", "distrito", "direccion",
     "area_m2", "dormitorios", "banos", "estacionamientos", "precio", "moneda", "precio_usd",
-    "mantenimiento_usd", "fecha_entrega", "constructora", "descripcion", "activo", "ultima_vez",
+    "mantenimiento_usd", "fecha_entrega", "constructora", "descripcion", "activo", "ultima_vez", "antiguedad_anios",
 ]
 
 
@@ -24,6 +24,9 @@ def normalizar(item, fuente_id, tc):
     texto = pista.lower()
     if item["estado"] == "terminado" and ("/proyecto" in texto or " desde " in f" {texto}") and "entrega inmediata" not in texto:
         item["estado"] = "preventa"
+    anios = item.get("antiguedad_anios")
+    anios = anios if isinstance(anios, int) and 0 <= anios < 150 else base.antiguedad(pista)
+    item["antiguedad_anios"] = 0 if item["estado"] in ("en_planos", "preventa") else anios
     lugar = ubigeo.resolver(item.get("distrito"), item.get("provincia"), item.get("departamento"))
     if lugar.get("distrito"):
         if lugar.get("barrio") and not item.get("direccion"):
