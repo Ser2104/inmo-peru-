@@ -92,5 +92,10 @@ class FakeDB:
 
     tamano = 10_000_000
 
+    def rpc_ubicar(self, filas):
+        for x in filas:
+            self.update("inmuebles", {k: x[k] for k in ("lat", "lng", "ubicacion_precision")}, id=f"eq.{x['id']}")
+        return len(filas)
+
     def rpc(self, funcion, **args):
         return self.tamano if funcion == "tamano_db" else {"limpiado": True}

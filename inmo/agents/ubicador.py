@@ -109,19 +109,30 @@ class Ubicador:
         return (*desplazar(*centro, inm["id"]), "distrito") if centro else None
 
 
+def guardar_lote(db, lote):
+    if not lote:
+        return 0
+    if hasattr(db, "rpc_ubicar"):
+        return db.rpc_ubicar(lote)
+    db.rpc("ubicar_lote", filas=lote)
+    return len(lote)
+
+
 def ejecutar(db, limite_direcciones=700):
     u = Ubicador(db)
     pendientes = db.select_all("inmuebles", select="id,direccion,distrito,provincia,departamento,lat,lng", activo="eq.true", ubicacion_precision="is.null")
-    rapidos = 0
+    rapidos, lote = 0, []
     for inm in pendientes:
         if inm.get("lat") and inm.get("lng") and dentro_peru(inm["lat"], inm["lng"]):
-            db.update("inmuebles", {"ubicacion_precision": "exacta"}, id=f"eq.{inm['id']}")
-            rapidos += 1
-            continue
-        r = u.ubicar({**inm, "direccion": None})
-        if r:
-            db.update("inmuebles", {"lat": r[0], "lng": r[1], "ubicacion_precision": r[2]}, id=f"eq.{inm['id']}")
-            rapidos += 1
+            lote.append({"id": inm["id"], "lat": inm["lat"], "lng": inm["lng"], "ubicacion_precision": "exacta"})
+        else:
+            r = u.ubicar({**inm, "direccion": None})
+            if r:
+                lote.append({"id": inm["id"], "lat": r[0], "lng": r[1], "ubicacion_precision": r[2]})
+        if len(lote) >= 500:
+            rapidos += guardar_lote(db, lote)
+            lote = []
+    rapidos += guardar_lote(db, lote)
     afinados = 0
     por_afinar = db.select("inmuebles", select="id,direccion,distrito,provincia,departamento", activo="eq.true", ubicacion_precision="eq.distrito", direccion="not.is.null", limit=str(limite_direcciones * 2))
     for inm in por_afinar:
@@ -139,7 +150,7 @@ def ejecutar(db, limite_direcciones=700):
 def reubicar(db, tabla="inmuebles"):
     u = Ubicador(db)
     filas = db.select_all(tabla, select="id,distrito,provincia,departamento,lat,lng" + (",ubicacion_precision" if tabla == "inmuebles" else ""), activo="eq.true") if tabla == "inmuebles" else db.select_all(tabla, select="id,distrito,provincia,departamento,lat,lng")
-    movidos = 0
+    movidos, lote = 0, []
     for f in filas:
         if f.get("lat") is None or f.get("ubicacion_precision") == "exacta":
             continue
@@ -149,6 +160,13 @@ def reubicar(db, tabla="inmuebles"):
         if f.get("ubicacion_precision") == "direccion" and km((f["lat"], f["lng"]), centro) <= MAX_KM_DIRECCION:
             continue
         lat, lng = desplazar(*centro, f["id"])
-        db.update(tabla, {"lat": lat, "lng": lng, **({"ubicacion_precision": "distrito"} if tabla == "inmuebles" else {})}, id=f"eq.{f['id']}")
+        if tabla == "inmuebles":
+            lote.append({"id": f["id"], "lat": lat, "lng": lng, "ubicacion_precision": "distrito"})
+            if len(lote) >= 500:
+                guardar_lote(db, lote)
+                lote = []
+        else:
+            db.update(tabla, {"lat": lat, "lng": lng}, id=f"eq.{f['id']}")
         movidos += 1
+    guardar_lote(db, lote)
     return {"reubicados": movidos, "consultas_nuevas": u.nuevas}
