@@ -84,7 +84,7 @@ def main():
         print(mantenimiento.renormalizar(db))
         return
     if a.tarea == "probar":
-        mantenimiento.probar(a.urls or [])
+        mantenimiento.probar(a.urls or [], db)
         return
     if a.tarea == "respaldo":
         print(mantenimiento.respaldo(db))
