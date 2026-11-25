@@ -139,8 +139,9 @@ def leer_bases(db, descargar=None, limite=150):
     if not p or not llm.disponible():
         return {"omitido": "sin perfil o sin IA"}
     descargar = descargar or (lambda url: base.descargar(url, intentos=2))
-    candidatas = db.select("coincidencias", select="oportunidad_id,puntaje", perfil_id=f"eq.{p['id']}", encaja="eq.true",
-                           bases_leidas="eq.false", order="puntaje.desc", limit=str(limite))
+    candidatas = [c for c in db.select_all("coincidencias", select="oportunidad_id,puntaje,bases_leidas,requisitos", perfil_id=f"eq.{p['id']}", encaja="eq.true")
+                  if not c.get("bases_leidas") or "sin_experiencia" not in (c.get("requisitos") or {})]
+    candidatas = sorted(candidatas, key=lambda c: -(c.get("puntaje") or 0))[:limite]
     leidas = 0
     for c in candidatas:
         o = (db.select("oportunidades", select="id,url,fecha_limite", id=f"eq.{c['oportunidad_id']}") or [None])[0]
