@@ -20,7 +20,10 @@ def saldo_hipoteca(principal, tea, anios, meses_pagados):
 
 
 def van(flujos, tasa):
-    return sum(f / (1 + tasa) ** t for t, f in enumerate(flujos))
+    try:
+        return sum(f / (1 + tasa) ** t for t, f in enumerate(flujos))
+    except (OverflowError, ZeroDivisionError):
+        return flujos[0] if tasa > 0 else next((f for f in reversed(flujos) if f), 0) * float("inf")
 
 
 def tir(flujos):

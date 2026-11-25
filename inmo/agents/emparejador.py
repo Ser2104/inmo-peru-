@@ -165,6 +165,7 @@ def leer_bases(db, descargar=None, limite=150):
         if limite_f and not o.get("fecha_limite"):
             db.update("oportunidades", {"fecha_limite": limite_f}, id=f"eq.{o['id']}")
         leidas += 1
+        db.registrar("emparejador:bases", True, {"avance": leidas, "de": len(candidatas)})
     return {"bases_leidas": leidas}
 
 

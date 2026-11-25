@@ -67,8 +67,17 @@ class DB:
         params = {"on_conflict": on_conflict} if on_conflict else {}
         pref = "resolution=merge-duplicates," + ("return=representation" if devolver else "return=minimal")
         salida = []
-        for i in range(0, len(filas), 500):
-            r = _con_reintentos(self.http.post, f"/{tabla}", params=params, content=json.dumps(filas[i:i + 500], default=str), headers={"Prefer": pref})
+        lotes = [filas[i:i + 200] for i in range(0, len(filas), 200)]
+        while lotes:
+            lote = lotes.pop(0)
+            try:
+                r = _con_reintentos(self.http.post, f"/{tabla}", params=params, content=json.dumps(lote, default=str), headers={"Prefer": pref})
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code < 500 or len(lote) <= 10:
+                    raise
+                mitad = len(lote) // 2
+                lotes[:0] = [lote[:mitad], lote[mitad:]]
+                continue
             if devolver:
                 salida += r.json()
         return salida
