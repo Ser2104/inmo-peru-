@@ -120,6 +120,8 @@ def probar(urls, db=None):
             html = base.descargar(url, intentos=1, pausa=(0, 0))
         except RuntimeError as e:
             print(url, "->", e)
+            if db:
+                db.registrar("probar", False, {"url": url, "error": str(e)})
             continue
         import re as _re
         for patron in (r'.{40}(?:"latitude"|"lat"|geolocation|data-lat).{80}', r'https?://[^"\' ]*api[^"\' ]{0,80}', r'__NEXT_DATA__.{0,200}'):
