@@ -5,7 +5,7 @@ from inmo.config import PARAMETROS_BASE
 
 CLAVES = {"inmuebles": ["url"], "precios_historial": ["inmueble_id", "fecha"], "analisis": ["inmueble_id"], "alertas": ["inmueble_id"],
           "parametros": ["clave"], "fuentes": ["id"], "zonas_stats": ["departamento", "provincia", "distrito", "tipo", "operacion", "segmento"],
-          "series_macro": ["codigo", "periodo"], "ejecuciones": [None], "pistas": ["clave"], "mercado_temporal": ["clave"], "regulacion_temporal": ["departamento", "distrito"], "arbitraje": ["inmueble_id"], "geocache": ["consulta"], "rastreo": ["url"], "concesiones": ["clave"], "entorno": ["clave"], "oportunidades": ["clave"]}
+          "series_macro": ["codigo", "periodo"], "ejecuciones": [None], "pistas": ["clave"], "mercado_temporal": ["clave"], "regulacion_temporal": ["departamento", "distrito"], "arbitraje": ["inmueble_id"], "geocache": ["consulta"], "rastreo": ["url"], "concesiones": ["clave"], "entorno": ["clave"], "oportunidades": ["clave"], "perfiles": ["id"], "coincidencias": ["oportunidad_id", "perfil_id"]}
 
 
 def _cumple(fila, campo, cond):
@@ -59,7 +59,7 @@ class FakeDB:
                 existente.update(f)
             else:
                 existente = dict(f)
-                if tabla in ("inmuebles", "pistas", "concesiones"):
+                if tabla in ("inmuebles", "pistas", "concesiones", "oportunidades"):
                     existente.setdefault("id", str(uuid.uuid4()))
                     existente.setdefault("primera_vez", datetime.now(timezone.utc).isoformat())
                 if tabla == "concesiones":

@@ -69,6 +69,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;borde
   <button class="btn" id="b-arbitraje">🔑 Subalquilar por días</button>
   <button class="btn" id="b-negocios">🏪 Negocios y concesiones</button>
   <button class="btn" id="b-oportunidades">💼 Oportunidades de trabajo</button>
+  <span id="modos-op" hidden><button class="btn activo" id="b-paramí">🎯 Solo lo que me sirve</button><button class="btn" id="b-perfil">✏️ Mi perfil</button></span>
   <span id="modos"><button class="btn" data-modo="temporal">🏖️ Airbnb rentable</button><button class="btn" data-modo="largo_plazo">🏠 Alquiler a largo plazo</button></span>
   <button class="btn" id="b-zonas">🗺️ Zonas</button>
   <button class="btn" id="b-contactar">📞 Contactar</button>
@@ -106,6 +107,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;borde
 
 <div class="panel" id="lista"><button class="cerrar" data-cierra="lista">×</button><h2>Las mejores oportunidades</h2><p class="sub">Según los filtros y el plazo elegido</p><div id="items"></div></div>
 <div class="panel" id="contactar"><button class="cerrar" data-cierra="contactar">×</button><h2>Por contactar</h2><p class="sub">Proyectos y negocios a los que les falta información. Escríbeles por WhatsApp, pega aquí su respuesta y la IA la analiza en el siguiente ciclo.</p><div id="pistas"></div></div>
+<div class="panel" id="perfil"><button class="cerrar" data-cierra="perfil">×</button><h2>Lo que tienes y ofreces</h2>
+  <p class="sub">Descríbelo con tus palabras: qué equipos tienes, cuántos, de qué tipo y año, si vas con conductor u operador, y qué no haces. La IA revisa cada convocatoria contra esto.</p>
+  <textarea id="p-desc" rows="7" style="width:100%;font:inherit"></textarea>
+  <label>Departamentos donde trabajas (vacío = todo el Perú)</label><input id="p-deps" placeholder="Arequipa, Moquegua, Cusco" style="width:100%">
+  <button class="btn activo" id="p-guardar" style="margin-top:10px">Guardar</button><p class="sub" id="p-msg"></p></div>
 <div class="panel" id="detalle"><button class="cerrar" data-cierra="detalle">×</button><div id="contenido"></div></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

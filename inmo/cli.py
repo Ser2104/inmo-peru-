@@ -8,7 +8,7 @@ from datetime import date
 from . import config, mantenimiento
 from .db import DB
 from .collectors import bcrp, runner
-from .agents import analista, auditor, buscador, alertas, mejora, vigilante, explorador, temporal, ubicador, rastreador, concesiones, confirmador, oportunidades
+from .agents import analista, auditor, buscador, alertas, mejora, vigilante, explorador, temporal, ubicador, rastreador, concesiones, confirmador, oportunidades, emparejador
 
 
 class Tiempo(BaseException):
@@ -51,7 +51,7 @@ def recolectar(db, p, completo):
 def main():
     ap = argparse.ArgumentParser(description="Analizador inmobiliario Perú")
     ap.add_argument("tarea", choices=["ciclo", "completo", "bcrp", "buscar", "analizar", "auditar", "alertas", "mejorar",
-                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear", "rapido", "concesiones", "confirmar", "reubicar", "barrer", "oportunidades"])
+                                      "vigilar", "respaldo", "restaurar", "diagnostico", "explorar", "verificar", "temporal", "ubicar", "renormalizar", "probar", "rastrear", "rapido", "concesiones", "confirmar", "reubicar", "barrer", "oportunidades", "emparejar"])
     ap.add_argument("--urls", nargs="*")
     ap.add_argument("--departamentos", nargs="*")
     ap.add_argument("--fuentes", nargs="*", default=[])
@@ -108,6 +108,10 @@ def main():
     if a.tarea in ("ciclo", "verificar"):
         paso(db, "verificador", lambda: explorador.verificar(db, p))
         paso(db, "respuestas", lambda: explorador.procesar_respuestas(db, p))
+    if a.tarea in ("ciclo", "emparejar"):
+        paso(db, "emparejador", lambda: emparejador.evaluar(db))
+    if a.tarea == "emparejar" and "bases" in a.fuentes:
+        paso(db, "emparejador:bases", lambda: emparejador.leer_bases(db))
     if a.tarea in ("oportunidades", "completo"):
         paso(db, "oportunidades", lambda: oportunidades.ejecutar(db, p, con_web="seace" not in a.fuentes))
     if a.tarea in ("concesiones", "completo"):

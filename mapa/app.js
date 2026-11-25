@@ -5,7 +5,7 @@ const pct = (x) => (x == null ? "—" : (x * 100).toFixed(1) + "%");
 const COLOR = { verde: "#1a7f37", ambar: "#c78a00", rojo: "#c62828", gris: "#6b7280" };
 const DEMO = new URLSearchParams(location.search).has("demo");
 
-const estado = { capa: "inversion", horizonte: "total", veredictos: new Set(["Comprar", "Negociar", "Revisar a mano"]), zonas: false };
+const estado = { paraMi: true, capa: "inversion", horizonte: "total", veredictos: new Set(["Comprar", "Negociar", "Revisar a mano"]), zonas: false };
 let inmuebles = [], arbitrajes = [], negocios = [], oportunidades = [], sb = null;
 
 const PERU = L.latLngBounds([-18.6, -81.6], [0.2, -68.4]);
@@ -56,7 +56,7 @@ function filtrados() {
   const precio = +$("f-precio").value || Infinity;
   if (estado.capa === "oportunidades") {
     const r = $("f-rubro").value;
-    return oportunidades.filter((i) => (!dep || i.departamento === dep) && (!dist || i.distrito === dist) && (!r || i.rubro === r) && (i.monto_usd ?? 0) <= precio);
+    return oportunidades.filter((i) => (!estado.paraMi || i.encaja) && (!dep || i.departamento === dep) && (!dist || i.distrito === dist) && (!r || i.rubro === r) && (i.monto_usd ?? 0) <= precio);
   }
   if (estado.capa === "negocios") {
     const t = $("f-negocio").value;
@@ -107,7 +107,7 @@ function dibujarZonas(lista) {
 
 function dibujarLista(lista) {
   const op = estado.capa === "oportunidades";
-  const top = [...lista].sort((a, b) => op ? (b.monto_usd ?? 0) - (a.monto_usd ?? 0) : (puntaje(b) ?? 0) - (puntaje(a) ?? 0)).slice(0, 30);
+  const top = [...lista].sort((a, b) => op ? ((b.puntaje_perfil ?? 0) - (a.puntaje_perfil ?? 0)) || ((b.monto_usd ?? 0) - (a.monto_usd ?? 0)) : (puntaje(b) ?? 0) - (puntaje(a) ?? 0)).slice(0, 30);
   $("items").innerHTML = top.map((i, n) => `<div class="item" data-n="${n}"><b style="color:${colorDe(i)}">${op ? "💼" : (puntaje(i) ?? 0).toFixed(1)}</b> · ${esc((i.titulo || i.nombre || i.tipo || "Inmueble").slice(0, 120))}<br>
     <span class="sub">${esc(i.distrito || "")}, ${esc(i.departamento || "")} · ${estado.capa === "oportunidades" ? esc(i.rubro) + " · " + (i.monto_usd ? usd(i.monto_usd) : "monto no indicado") + (i.fecha_limite ? " · vence " + i.fecha_limite : "") : estado.capa === "negocios" ? esc(i.veredicto) + " · " + usd(i.inversion_usd) : estado.capa === "arbitraje" ? usd(i.utilidad_mensual_usd) + "/mes de ganancia" : usd(i.precio_usd)}</span></div>`).join("") || '<p class="sub">No hay inmuebles con estos filtros.</p>';
   $("items").querySelectorAll(".item").forEach((el) => el.onclick = () => { const i = top[+el.dataset.n]; mapa.setView([i.lat, i.lng], 16); abrir(i); });
@@ -154,7 +154,7 @@ async function abrir(i) {
       <div class="dato"><small>Monto referencial</small><b>${usd(i.monto_usd)}</b></div>
       <div class="dato"><small>Publicado</small><b>${esc(i.fecha_publicacion || "—")}</b></div>
       <div class="dato"><small>Fecha límite</small><b>${esc(i.fecha_limite || "—")}</b></div></div>
-      <p>${esc(i.descripcion || "")}</p>
+      ${paraTi(i)}<p>${esc(i.descripcion || "")}</p>
       ${i.fuente === "seace" ? `<p class="sub">Compra del Estado en etapa de convocatoria. Para ver bases y cronograma, busca el código <b>${esc((i.metodo || "").split(" · ")[1] || "")}</b> en el <a href="https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml" target="_blank" rel="noopener">buscador del SEACE</a>. Para postular necesitas estar inscrito en el Registro Nacional de Proveedores (RNP).</p>` : '<p class="sub">' + (i.fuente === "banco_mundial" ? "Licitación financiada por el Banco Mundial: revisa requisitos y documentos en el enlace." : "Pedido encontrado en internet: confirma con ellos que siga vigente.") + '</p>'}
       ${i.correo ? `<p class="sub">Correo: <a href="mailto:${esc(i.correo)}">${esc(i.correo)}</a></p>` : ""}${i.web ? `<p class="sub">Web: <a href="${esc(i.web)}" target="_blank" rel="noopener">${esc(i.web)}</a></p>` : ""}
       <div class="aviso">📍 Ubicación aproximada: se muestra en la ciudad de quien lo pide.</div>${fuente({ url: i.url, telefono: /^51\d{9}$/.test(i.telefono || "") ? i.telefono : null, entidad: i.entidad }, "Hola, vi su convocatoria y me interesa ofrecer el servicio. ¿Sigue vigente?")}${i.telefono && !/^51\d{9}$/.test(i.telefono) ? `<p class="sub">Teléfono: ${esc(i.telefono)}</p>` : ""}`;
@@ -239,7 +239,7 @@ function completo(a) {
 }
 
 function abrirPanel(id) {
-  if (innerWidth < 700) ["filtros", "lista", "detalle", "contactar"].filter((x) => x !== id).forEach((x) => $(x).classList.remove("abierto"));
+  if (innerWidth < 700) ["filtros", "lista", "detalle", "contactar", "perfil"].filter((x) => x !== id).forEach((x) => $(x).classList.remove("abierto"));
   $(id).classList.add("abierto");
 }
 
@@ -319,6 +319,7 @@ $("f-veredicto").querySelectorAll(".btn").forEach((b) => b.onclick = () => {
 $("f-dep").onchange = () => { $("f-dist").value = ""; opciones(); dibujar(); };
 function modos() {
   $("modos").hidden = estado.capa !== "inversion";
+  $("modos-op").hidden = estado.capa !== "oportunidades";
   $("modos").querySelectorAll(".btn").forEach((b) => b.classList.toggle("activo", b.dataset.modo === $("f-estrategia").value));
 }
 $("modos").querySelectorAll(".btn").forEach((b) => b.onclick = () => {
@@ -331,6 +332,32 @@ $("f-estrategia").addEventListener("change", modos);
 $("f-puntaje").oninput = () => { $("v-puntaje").textContent = $("f-puntaje").value; dibujar(); };
 
 const mensaje = (p) => `Hola, soy asistente de Sergio Yacolca, de YACU Grupo Inmobiliario. Nos interesa invertir en ${p.nombre || "su proyecto"}${p.distrito ? " en " + p.distrito : ""}. ¿Nos podrían enviar precios, metrajes, fecha de entrega, forma de pago y mantenimiento de las unidades disponibles? Gracias.`;
+
+function paraTi(i) {
+  if (i.encaja == null) return '<div class="aviso">🎯 La IA aún no revisa esta convocatoria contra tu perfil.</div>';
+  const r = i.requisitos || {};
+  const filas = [["Qué piden", i.que_piden || r.tipo_requerido], ["Cantidad", r.cantidad], ["Antigüedad máxima", r.antiguedad_maxima != null ? r.antiguedad_maxima + " años" : null],
+    ["Con conductor", r.con_conductor == null ? null : r.con_conductor ? "Sí" : "No"], ["Plazo", r.plazo], ["Lugar", r.lugar]].filter(([, v]) => v);
+  return `<h3>🎯 ¿Te sirve? ${i.encaja ? `<span style="color:${COLOR.verde}">Sí (${i.puntaje_perfil ?? "—"}/100)</span>` : `<span style="color:${COLOR.rojo}">No</span>`}</h3>
+    <p class="sub">${esc(i.razon || "")}</p>${filas.length ? `<table>${filas.map(([k, v]) => `<tr><td>${k}</td><td>${esc(v)}</td></tr>`).join("")}</table>` : ""}
+    ${(r.requisitos_clave || []).length ? `<p class="sub">Requisitos: ${r.requisitos_clave.map(esc).join(" · ")}</p>` : ""}
+    ${i.requisitos ? '<p class="sub">✔ Revisado leyendo las bases oficiales.</p>' : '<p class="sub">Revisado con el resumen; las bases se leen en el próximo ciclo de tu PC.</p>'}`;
+}
+
+async function abrirPerfil() {
+  abrirPanel("perfil");
+  if (DEMO) return;
+  const { data } = await sb.from("perfiles").select("descripcion,departamentos").eq("id", "principal").single();
+  $("p-desc").value = data?.descripcion || "";
+  $("p-deps").value = (data?.departamentos || []).join(", ");
+}
+$("b-perfil").onclick = abrirPerfil;
+$("b-paramí").onclick = () => { estado.paraMi = !estado.paraMi; $("b-paramí").classList.toggle("activo", estado.paraMi); dibujar(); };
+$("p-guardar").onclick = async () => {
+  const deps = $("p-deps").value.split(",").map((x) => x.trim()).filter(Boolean);
+  const { error } = await sb.from("perfiles").update({ descripcion: $("p-desc").value.trim(), departamentos: deps.length ? deps : null }).eq("id", "principal");
+  $("p-msg").textContent = error ? error.message : "✅ Guardado. La IA volverá a revisar todas las convocatorias en el próximo ciclo (máx. 6 horas).";
+};
 
 const mensajeNegocio = (p) => `Hola, soy asistente de Sergio Yacolca, de YACU Grupo Inmobiliario. Nos interesa ${p.nombre || "su negocio"}${p.distrito ? " en " + p.distrito : ""}. ¿Nos podrían indicar la inversión o precio, el canon o alquiler mensual, las ventas promedio al mes y la duración del contrato? Gracias.`;
 
