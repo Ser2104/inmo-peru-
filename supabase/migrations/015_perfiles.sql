@@ -40,8 +40,7 @@ create table coincidencias (
 alter table coincidencias enable row level security;
 create policy mapa_lee_coincidencias on coincidencias for select to authenticated using (puede_ver_mapa());
 
-drop view mapa_oportunidades;
-create view mapa_oportunidades with (security_invoker = true) as
+create or replace view mapa_oportunidades with (security_invoker = true) as
 select o.id, o.fuente, o.titulo, o.descripcion, o.rubro, o.categoria, o.metodo, o.entidad, o.telefono, o.correo, o.web, o.departamento, o.provincia, o.distrito,
        o.lat, o.lng, o.monto_usd, o.fecha_publicacion, o.fecha_limite, o.url,
        c.encaja, c.puntaje as puntaje_perfil, c.razon, c.que_piden, c.requisitos
