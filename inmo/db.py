@@ -37,7 +37,21 @@ class DB:
     def select(self, tabla, **params):
         return _con_reintentos(self.http.get, f"/{tabla}", params=params).json()
 
+    CLAVE_ORDEN = {"inmuebles": "id", "oportunidades": "id", "analisis": "inmueble_id", "arbitraje": "inmueble_id", "concesiones": "id"}
+
     def select_all(self, tabla, pagina=1000, **params):
+        clave = self.CLAVE_ORDEN.get(tabla)
+        if clave and "order" not in params and clave in str(params.get("select", clave)).split(",") + ["*"] or (clave and params.get("select") == "*"):
+            filas, ultimo = [], None
+            while True:
+                extra = {"order": f"{clave}.asc", "limit": str(pagina)}
+                if ultimo:
+                    extra[clave] = f"gt.{ultimo}"
+                lote = _con_reintentos(self.http.get, f"/{tabla}", params={**params, **extra}).json()
+                filas += lote
+                if len(lote) < pagina:
+                    return filas
+                ultimo = lote[-1][clave]
         filas, inicio = [], 0
         while True:
             lote = _con_reintentos(self.http.get, f"/{tabla}", params=params, headers={"Range": f"{inicio}-{inicio + pagina - 1}"}).json()
