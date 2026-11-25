@@ -121,5 +121,8 @@ def probar(urls):
         except RuntimeError as e:
             print(url, "->", e)
             continue
+        import re as _re
+        for patron in (r'.{40}(?:"latitude"|"lat"|geolocation|data-lat).{80}', r'https?://[^"\' ]*api[^"\' ]{0,80}', r'__NEXT_DATA__.{0,200}'):
+            print("  muestra:", [m.group(0)[:200] for m in list(_re.finditer(patron, html))[:3]])
         items = navent.parsear(html, url) or ia.extraer(html, url)
         print(url, "->", len(items), "avisos;", [i.get("url") for i in items[:3]])
