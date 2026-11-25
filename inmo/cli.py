@@ -111,7 +111,11 @@ def main():
     if a.tarea in ("oportunidades", "completo"):
         paso(db, "oportunidades", lambda: oportunidades.ejecutar(db, p, con_web="seace" not in a.fuentes))
     if a.tarea in ("concesiones", "completo"):
-        paso(db, "concesiones", lambda: concesiones.ejecutar(db, p))
+        paso(db, "concesiones:buscar", lambda: concesiones.buscar(db, p))
+        paso(db, "concesiones:analizar", lambda: concesiones.analizar(db, p))
+        paso(db, "concesiones:completar", lambda: concesiones.completar(db, p))
+        paso(db, "concesiones:analizar", lambda: concesiones.analizar(db, p))
+        paso(db, "concesiones:locales", lambda: concesiones.locales_estrategicos(db))
     if a.tarea in ("mejorar", "completo"):
         paso(db, "mejora", lambda: mejora.ejecutar(db, p))
     if a.tarea == "completo":

@@ -84,15 +84,20 @@ def diagnostico(db):
 
 def renormalizar(db):
     from . import ubigeo
+    from .config import DEPARTAMENTOS
     cambios = 0
     for i in db.select_all("inmuebles", select="id,url,titulo,descripcion,estado,departamento,provincia,distrito,direccion"):
         lugar = ubigeo.resolver(i.get("distrito"), i.get("provincia"), i.get("departamento"))
         nuevo = {}
+        if not lugar.get("departamento") and i.get("departamento") not in DEPARTAMENTOS:
+            db.update("inmuebles", {"activo": False}, id=f"eq.{i['id']}")
+            cambios += 1
+            continue
         if lugar.get("distrito") and (lugar["distrito"], lugar["departamento"]) != (i.get("distrito"), i.get("departamento")):
             nuevo = {k: lugar[k] for k in ("departamento", "provincia", "distrito")}
             if lugar.get("barrio") and not i.get("direccion"):
                 nuevo["direccion"] = lugar["barrio"]
-            nuevo["ubicacion_precision"] = None
+            nuevo.update(ubicacion_precision=None, lat=None, lng=None)
         texto = f"{i.get('url')} {i.get('titulo')} {i.get('descripcion')}".lower()
         if i.get("estado") == "terminado" and ("/proyecto" in texto or " desde " in f" {texto}") and "entrega inmediata" not in texto:
             nuevo["estado"] = "preventa"
