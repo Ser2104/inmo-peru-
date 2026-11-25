@@ -8,6 +8,7 @@ LOTE = 20
 
 PROMPT = """Eres el asistente comercial de un proveedor peruano. Esto es lo que tiene y ofrece:
 \"\"\"{perfil}\"\"\"
+Sus equipos: {activos}
 {zona}
 Revisa estas convocatorias y decide, una por una, si este proveedor podría ganarlas y cumplirlas con lo que tiene.
 Encaja SOLO si lo que piden como servicio o bien principal es algo que él puede dar directamente (por ejemplo, si tiene camionetas:
@@ -16,13 +17,15 @@ que solo menciona vehículos de pasada, otro tipo de vehículo que no tiene (vol
 Ante la duda, no encaja.
 
 Devuelve una lista JSON con un objeto por convocatoria: id, encaja (true/false), puntaje (0-100: qué tan bien calza),
-razon (máx. 140 caracteres, en español simple), que_piden (máx. 100 caracteres: qué, cuántos, dónde y por cuánto tiempo, si se sabe).
+razon (máx. 140 caracteres, en español simple: qué de lo suyo usaría), que_piden (máx. 100 caracteres: qué, cuántos, dónde y por cuánto tiempo, si se sabe).
+Compara también cantidades: si piden más unidades de las que tiene, baja el puntaje y dilo en la razón.
 
 CONVOCATORIAS:
 {lista}"""
 
 PROMPT_BASES = """Estas son las bases de una convocatoria del Estado peruano. El proveedor tiene esto:
 \"\"\"{perfil}\"\"\"
+Sus equipos: {activos}
 Extrae un objeto JSON con: fecha_limite (AAAA-MM-DD para presentar ofertas, o null), cantidad (de unidades o servicios),
 tipo_requerido (qué vehículo o equipo exacto piden), antiguedad_maxima (años, o null), con_conductor (true/false/null),
 plazo (duración del servicio), lugar (dónde se presta), monto_referencial (número o null), requisitos_clave (lista de máx. 6 textos cortos:
@@ -30,6 +33,14 @@ RNP, experiencia, SOAT, GPS, seguros, garantías...), cumple (true/false: si con
 
 BASES:
 {texto}"""
+
+
+def items_texto(o):
+    return "; ".join(f"{i.get('cantidad') or '?'} {i.get('unidad') or ''} {i.get('clase') or i.get('descripcion') or ''}".strip() for i in (o.get("items") or [])[:8]) or "—"
+
+
+def activos_texto(p):
+    return "; ".join(f"{a.get('cantidad') or 1} × {a.get('que')}{(' (' + a['detalle'] + ')') if a.get('detalle') else ''}" for a in (p.get("activos") or [])) or "ver descripción"
 
 
 def perfil(db, id_="principal"):
@@ -40,7 +51,7 @@ def perfil(db, id_="principal"):
 def pendientes(db, p):
     hechas = {c["oportunidad_id"] for c in db.select_all("coincidencias", select="oportunidad_id", perfil_id=f"eq.{p['id']}", version=f"eq.{p['version']}")}
     hoy = date.today().isoformat()
-    filas = db.select_all("oportunidades", select="id,titulo,descripcion,entidad,departamento,provincia,distrito,monto_usd,fecha_limite,fecha_publicacion,categoria,metodo")
+    filas = db.select_all("oportunidades", select="id,titulo,descripcion,entidad,departamento,provincia,distrito,monto_usd,fecha_limite,fecha_publicacion,categoria,metodo,items")
     deps = set(p.get("departamentos") or [])
     return [o for o in filas if o["id"] not in hechas and (not o.get("fecha_limite") or o["fecha_limite"] >= hoy)
             and (not deps or o.get("departamento") in deps)]
@@ -56,9 +67,9 @@ def evaluar(db, maximo=4000):
     for k in range(0, len(lista), LOTE):
         lote = lista[k:k + LOTE]
         texto = "\n".join(f"- id={o['id']} | {o.get('titulo') or ''} | {str(o.get('descripcion') or '')[:400]} | pide: {o.get('entidad') or '—'} | "
-                          f"lugar: {', '.join(x for x in (o.get('distrito'), o.get('departamento')) if x)} | monto US$ {o.get('monto_usd') or '—'}" for o in lote)
+                          f"lugar: {', '.join(x for x in (o.get('distrito'), o.get('departamento')) if x)} | monto US$ {o.get('monto_usd') or '—'} | ítems: {items_texto(o)}" for o in lote)
         try:
-            datos = llm.pedir_json(PROMPT.format(perfil=p["descripcion"], zona=zona, lista=texto))
+            datos = llm.pedir_json(PROMPT.format(perfil=p["descripcion"], activos=activos_texto(p), zona=zona, lista=texto))
         except RuntimeError:
             continue
         por_id = {str(d.get("id")): d for d in datos if isinstance(d, dict)} if isinstance(datos, list) else {}
@@ -92,7 +103,7 @@ def leer_bases(db, descargar=None, limite=60):
         try:
             texto = descargar(o["url"])
             texto = texto[5:] if texto.startswith("<pdf>") else re.sub(r"<[^>]+>", " ", texto)
-            req = llm.pedir_json(PROMPT_BASES.format(perfil=p["descripcion"], texto=texto[:30000]))
+            req = llm.pedir_json(PROMPT_BASES.format(perfil=p["descripcion"], activos=activos_texto(p), texto=texto[:30000]))
         except Exception:
             db.update("coincidencias", {"bases_leidas": True}, oportunidad_id=f"eq.{c['oportunidad_id']}", perfil_id=f"eq.{p['id']}")
             continue

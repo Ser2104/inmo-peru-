@@ -96,6 +96,10 @@ def desde_release(rel, tc):
         "fecha_limite": None,
         "url": docs[0] if docs else f"https://contratacionesabiertas.oece.gob.pe/proceso/{rel.get('ocid')}",
         "metodo": " · ".join(x for x in (tender.get("procurementMethodDetails"), codigo) if x),
+        "items": [{"descripcion": str(i.get("description") or (i.get("classification") or {}).get("description") or "")[:200],
+                   "clase": (i.get("classification") or {}).get("description"), "cantidad": i.get("quantity"),
+                   "unidad": (i.get("unit") or {}).get("name"), "monto": ((i.get("totalValue") or {}).get("amount"))}
+                  for i in (tender.get("items") or [])[:15]] or None,
     }
 
 

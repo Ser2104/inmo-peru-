@@ -28,6 +28,8 @@ select,input[type=number],input[type=email],input[type=password]{width:100%;padd
 .cerrar{float:right;border:none;background:none;font-size:22px;cursor:pointer;color:var(--gris)}
 h2{font-size:18px;margin:0 0 4px}h3{font-size:15px;margin:18px 0 6px}
 .sub{color:var(--gris);font-size:13px;margin:0 0 12px}
+.activo-fila{display:grid;grid-template-columns:2fr 70px 2fr 30px;gap:6px;margin:4px 0}
+.activo-fila input{width:100%;font:inherit}
 #pistas textarea{width:100%;min-height:70px;margin:6px 0;font:inherit}
 .veredicto{display:inline-block;color:#fff;border-radius:8px;padding:5px 12px;font-weight:600;font-size:14px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
@@ -109,7 +111,9 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px;borde
 <div class="panel" id="contactar"><button class="cerrar" data-cierra="contactar">×</button><h2>Por contactar</h2><p class="sub">Proyectos y negocios a los que les falta información. Escríbeles por WhatsApp, pega aquí su respuesta y la IA la analiza en el siguiente ciclo.</p><div id="pistas"></div></div>
 <div class="panel" id="perfil"><button class="cerrar" data-cierra="perfil">×</button><h2>Lo que tienes y ofreces</h2>
   <p class="sub">Descríbelo con tus palabras: qué equipos tienes, cuántos, de qué tipo y año, si vas con conductor u operador, y qué no haces. La IA revisa cada convocatoria contra esto.</p>
-  <textarea id="p-desc" rows="7" style="width:100%;font:inherit"></textarea>
+  <label>Mis equipos</label><div id="p-activos"></div><button class="btn" id="p-agregar" type="button">+ Agregar equipo</button>
+  <label>Qué ofreces y qué no (con tus palabras)</label>
+  <textarea id="p-desc" rows="5" style="width:100%;font:inherit"></textarea>
   <label>Departamentos donde trabajas (vacío = todo el Perú)</label><input id="p-deps" placeholder="Arequipa, Moquegua, Cusco" style="width:100%">
   <button class="btn activo" id="p-guardar" style="margin-top:10px">Guardar</button><p class="sub" id="p-msg"></p></div>
 <div class="panel" id="detalle"><button class="cerrar" data-cierra="detalle">×</button><div id="contenido"></div></div>

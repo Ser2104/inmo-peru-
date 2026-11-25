@@ -154,7 +154,7 @@ async function abrir(i) {
       <div class="dato"><small>Monto referencial</small><b>${usd(i.monto_usd)}</b></div>
       <div class="dato"><small>Publicado</small><b>${esc(i.fecha_publicacion || "—")}</b></div>
       <div class="dato"><small>Fecha límite</small><b>${esc(i.fecha_limite || "—")}</b></div></div>
-      ${paraTi(i)}<p>${esc(i.descripcion || "")}</p>
+      ${paraTi(i)}${itemsTabla(i)}<p>${esc(i.descripcion || "")}</p>
       ${i.fuente === "seace" ? `<p class="sub">Compra del Estado en etapa de convocatoria. Para ver bases y cronograma, busca el código <b>${esc((i.metodo || "").split(" · ")[1] || "")}</b> en el <a href="https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml" target="_blank" rel="noopener">buscador del SEACE</a>. Para postular necesitas estar inscrito en el Registro Nacional de Proveedores (RNP).</p>` : '<p class="sub">' + (i.fuente === "banco_mundial" ? "Licitación financiada por el Banco Mundial: revisa requisitos y documentos en el enlace." : "Pedido encontrado en internet: confirma con ellos que siga vigente.") + '</p>'}
       ${i.correo ? `<p class="sub">Correo: <a href="mailto:${esc(i.correo)}">${esc(i.correo)}</a></p>` : ""}${i.web ? `<p class="sub">Web: <a href="${esc(i.web)}" target="_blank" rel="noopener">${esc(i.web)}</a></p>` : ""}
       <div class="aviso">📍 Ubicación aproximada: se muestra en la ciudad de quien lo pide.</div>${fuente({ url: i.url, telefono: /^51\d{9}$/.test(i.telefono || "") ? i.telefono : null, entidad: i.entidad }, "Hola, vi su convocatoria y me interesa ofrecer el servicio. ¿Sigue vigente?")}${i.telefono && !/^51\d{9}$/.test(i.telefono) ? `<p class="sub">Teléfono: ${esc(i.telefono)}</p>` : ""}`;
@@ -336,6 +336,11 @@ $("f-puntaje").oninput = () => { $("v-puntaje").textContent = $("f-puntaje").val
 
 const mensaje = (p) => `Hola, soy asistente de Sergio Yacolca, de YACU Grupo Inmobiliario. Nos interesa invertir en ${p.nombre || "su proyecto"}${p.distrito ? " en " + p.distrito : ""}. ¿Nos podrían enviar precios, metrajes, fecha de entrega, forma de pago y mantenimiento de las unidades disponibles? Gracias.`;
 
+function itemsTabla(i) {
+  if (!i.items?.length) return "";
+  return `<h3>Qué piden exactamente</h3><table><tr><th>Cant.</th><th>Detalle</th></tr>${i.items.map((x) => `<tr><td>${esc(x.cantidad ?? "—")} ${esc(x.unidad || "")}</td><td>${esc(x.descripcion || x.clase || "")}</td></tr>`).join("")}</table>`;
+}
+
 function paraTi(i) {
   if (i.encaja == null) return '<div class="aviso">🎯 La IA aún no revisa esta convocatoria contra tu perfil.</div>';
   const r = i.requisitos || {};
@@ -347,10 +352,22 @@ function paraTi(i) {
     ${i.requisitos ? '<p class="sub">✔ Revisado leyendo las bases oficiales.</p>' : '<p class="sub">Revisado con el resumen; las bases se leen en el próximo ciclo de tu PC.</p>'}`;
 }
 
+function filaActivo(a = {}) {
+  const d = document.createElement("div");
+  d.className = "activo-fila";
+  d.innerHTML = `<input placeholder="Qué (ej. Camioneta 4x4)" value="${esc(a.que || "")}"><input type="number" min="1" placeholder="Cant." value="${esc(a.cantidad || "")}">
+    <input placeholder="Detalle (año, capacidad, con chofer)" value="${esc(a.detalle || "")}"><button class="btn" type="button">×</button>`;
+  d.querySelector("button").onclick = () => d.remove();
+  $("p-activos").appendChild(d);
+}
+$("p-agregar").onclick = () => filaActivo();
+
 async function abrirPerfil() {
   abrirPanel("perfil");
   if (DEMO) return;
-  const { data } = await sb.from("perfiles").select("descripcion,departamentos").eq("id", "principal").single();
+  const { data } = await sb.from("perfiles").select("descripcion,departamentos,activos").eq("id", "principal").single();
+  $("p-activos").innerHTML = "";
+  (data?.activos?.length ? data.activos : [{}]).forEach(filaActivo);
   $("p-desc").value = data?.descripcion || "";
   $("p-deps").value = (data?.departamentos || []).join(", ");
 }
@@ -358,7 +375,8 @@ $("b-perfil").onclick = abrirPerfil;
 $("b-paramí").onclick = () => { estado.paraMi = !estado.paraMi; $("b-paramí").classList.toggle("activo", estado.paraMi); dibujar(); };
 $("p-guardar").onclick = async () => {
   const deps = $("p-deps").value.split(",").map((x) => x.trim()).filter(Boolean);
-  const { error } = await sb.from("perfiles").update({ descripcion: $("p-desc").value.trim(), departamentos: deps.length ? deps : null }).eq("id", "principal");
+  const activos = [...$("p-activos").children].map((d) => { const [q, c, det] = d.querySelectorAll("input"); return { que: q.value.trim(), cantidad: +c.value || 1, detalle: det.value.trim() }; }).filter((a) => a.que);
+  const { error } = await sb.from("perfiles").update({ descripcion: $("p-desc").value.trim(), departamentos: deps.length ? deps : null, activos }).eq("id", "principal");
   $("p-msg").textContent = error ? error.message : "✅ Guardado. La IA volverá a revisar todas las convocatorias en el próximo ciclo (máx. 6 horas).";
 };
 
