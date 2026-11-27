@@ -126,8 +126,8 @@ def probar(urls, db=None):
         import re as _re
         for patron in (r'.{40}(?:"latitude"|"lat"|geolocation|data-lat).{80}', r'https?://[^"\' ]*api[^"\' ]{0,80}', r'__NEXT_DATA__.{0,200}'):
             print("  muestra:", [m.group(0)[:200] for m in list(_re.finditer(patron, html))[:3]])
-        muestras = [m.group(0)[:300] for m in list(_re.finditer(r'.{120}(?:antig|CFT5|ntig\\u00fc|Antig).{160}', html))[:6]]
+        nav = navent.parsear(html, url)
         if db:
-            db.registrar("probar", True, {"url": url, "muestras": muestras})
-        items = navent.parsear(html, url) or ia.extraer(html, url)
+            db.registrar(f"probar:{url[:80]}", True, {"bytes": len(html), "navent": len(nav), "ejemplo": nav[:1], "json": [m.group(0)[:150] for m in list(_re.finditer(r'(?:__NEXT_DATA__|application/ld\+json|"listings"|"results"|"totalResults"|"total_count"|"paging").{0,120}', html))[:4]]})
+        items = nav or ia.extraer(html, url)
         print(url, "->", len(items), "avisos;", [i.get("url") for i in items[:3]])
