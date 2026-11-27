@@ -18,6 +18,13 @@ CLAVES = {
 }
 
 
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return numero(v)
+
+
 def _plano(d, pref="", salida=None, nivel=0):
     salida = {} if salida is None else salida
     if nivel > 3 or not isinstance(d, dict):
@@ -81,7 +88,7 @@ def _item(d, base_url):
         item.update(distrito=str(p["addresslocality"]), departamento=str(p.get("addressregion") or p["addresslocality"]))
     elif isinstance(lugar, str) and "," in lugar:
         item.update({k: v for k, v in ubicacion(lugar).items() if v})
-    lat, lng = numero(_campo(p, "lat")), numero(_campo(p, "lng"))
+    lat, lng = _num(_campo(p, "lat")), _num(_campo(p, "lng"))
     if lat and lng and -19 < lat < 0 and -82 < lng < -68:
         item["lat"], item["lng"] = lat, lng
     for k in ("dormitorios", "banos"):

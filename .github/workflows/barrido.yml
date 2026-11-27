@@ -3,6 +3,10 @@ on:
   schedule:
     - cron: "0 4 * * 6"
   workflow_dispatch:
+    inputs:
+      fuentes:
+        description: 'lista JSON, ej. ["infocasas"]'
+        default: '["urbania-lima-venta","urbania-lima-alquiler","urbania-regiones","infocasas"]'
 jobs:
   leer:
     runs-on: ubuntu-latest
@@ -10,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fuente: [urbania-lima-venta, urbania-lima-alquiler, urbania-regiones]
+        fuente: ${{ fromJSON(inputs.fuentes || '["urbania-lima-venta","urbania-lima-alquiler","urbania-regiones","infocasas"]') }}
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
