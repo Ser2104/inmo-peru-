@@ -207,8 +207,8 @@ async function abrir(i) {
     <div class="grid">
       <div class="dato"><small>Precio</small><b>${usd(i.precio_usd)}</b></div>
       <div class="dato"><small>Te conviene pagar hasta</small><b>${usd(i.precio_max_recomendado)}</b></div>
-      <div class="dato"><small>Mejor forma de alquilar</small><b>${porDias ? "Airbnb 🏖️" : "Largo plazo 🏠"}</b></div>
-      <div class="dato"><small>Te quedaría al mes</small><b>${usd(porDias ? i.flujo_mensual_temporal : i.flujo_mensual_usd)}</b></div>
+      ${i.estrategia === "terreno" ? `<div class="dato"><small>Tipo de inversión</small><b>Terreno 🌄</b></div><div class="dato"><small>Ganancia anual (5 años)</small><b>${pct(i.tir_5)}</b></div>` : `<div class="dato"><small>Mejor forma de alquilar</small><b>${porDias ? "Airbnb 🏖️" : "Largo plazo 🏠"}</b></div>
+      <div class="dato"><small>Te quedaría al mes</small><b>${usd(porDias ? i.flujo_mensual_temporal : i.flujo_mensual_usd)}</b></div>`}
       <div class="dato"><small>Ganancia anual (10 años)</small><b>${pct(porDias ? i.tir_10_temporal : i.tir_10)}</b></div>
       <div class="dato"><small>Frente a su zona</small><b>${i.descuento_vs_zona == null ? "—" : Math.abs(i.descuento_vs_zona * 100).toFixed(0) + "% " + (i.descuento_vs_zona > 0 ? "más barato" : "más caro")}</b></div>
     </div>${confirmacion(i)}${aprox}${i.tipo === "local" ? zona(i.entorno, "¿Para qué negocio sirve este local?") : ""}<div id="extra"><p class="sub" style="margin-top:14px">Cargando análisis completo…</p></div>${enlace}`;
@@ -233,6 +233,11 @@ function listaParecidos(titulo, lista, alquiler) {
 
 function completo(a) {
   const d = a.detalle || {}, c = d.comparacion || {}, e = d.escenarios || {};
+  if (a.renta_mensual_usd === 0 && d.valor_zona_usd != null) return `<h3>Ten en cuenta</h3><ul>${(a.riesgos || []).map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
+    <table><tr><td>Valor según terrenos parecidos</td><td>${usd(d.valor_zona_usd)}</td></tr><tr><td>m² en la zona</td><td>${usd(d.m2_zona_usd)}</td></tr>
+    <tr><td>Ganancia anual en el peor caso (10 años)</td><td>${pct(d.tir_10_pesimista)}</td></tr><tr><td>Subida de valor usada</td><td>${pct(d.plusvalia_usada)} al año</td></tr></table>
+    ${listaParecidos("Terrenos parecidos en venta", d.parecidos?.venta)}
+    <p class="sub" style="margin-top:12px">Supone que lo compras, pagas impuesto predial y arbitrios (~0.8% al año) y lo vendes después. Revisa SUNARP y la zonificación antes de comprar.</p>`;
   const comp = c.temporal ? `<h3>Largo plazo vs. Airbnb</h3><table><tr><th></th><th>Largo plazo</th><th>Airbnb</th></tr>
     <tr><td>Cobras al año</td><td>${usd(c.largo_plazo.ingreso_bruto_anual)}</td><td>${usd(c.temporal.ingreso_bruto_anual)}</td></tr>
     <tr><td>Te queda al mes</td><td>${usd(c.largo_plazo.flujo_mensual_usd)}</td><td>${usd(c.temporal.flujo_mensual_usd)}</td></tr>

@@ -3,7 +3,7 @@ import statistics
 import unicodedata
 from datetime import datetime, timedelta, timezone
 
-from .finanzas import Supuestos, evaluar, escenarios, precio_maximo
+from .finanzas import Supuestos, evaluar, escenarios, precio_maximo, costos_compra, tir
 from . import temporal as tmp
 
 VERSION = "1.0"
@@ -152,7 +152,77 @@ def meses_hasta_renta(inm, ahora=None):
     return 24
 
 
+def flujos_terreno(precio, valor, plusvalia, anios, p, nuevo=False):
+    f = [-(precio + costos_compra(precio, nuevo, p))]
+    for t in range(1, anios + 1):
+        v = valor * (1 + plusvalia) ** t
+        f.append(-v * p.get("costo_anual_terreno", 0.008) + (v * (1 - p["comision_venta"]) if t == anios else 0))
+    return f
+
+
+def analizar_terreno(inm, indice, p, grupos):
+    precio, area = float(inm["precio_usd"]), float(inm.get("area_m2") or 0)
+    ven = parecidos(inm, grupos, "venta")
+    zv, nivel_v = buscar_zona(indice, inm, "venta", p["min_comparables"])
+    m2_zona = statistics.median(float(x["precio_usd"]) / float(x["area_m2"]) for x in ven) if len(ven) >= 5 else (zv["mediana_m2_usd"] * factor_tamano(area, 200) if zv and area else None)
+    valor = m2_zona * area if m2_zona and area else precio
+    descuento = 1 - precio / valor if m2_zona and area else None
+    plusvalia = _limitar(float(zv["plusvalia_anual"]), -0.03, 0.10) if zv and zv.get("plusvalia_anual") is not None and zv["n"] >= 30 else p["plusvalia_default"]
+    t5, t10 = tir(flujos_terreno(precio, valor, plusvalia, 5, p)), tir(flujos_terreno(precio, valor, plusvalia, 10, p))
+    pes = tir(flujos_terreno(precio, valor * 0.9, plusvalia - 0.02, 10, p))
+    meta = p["tasa_descuento"]
+    corto = round(_limitar(5 + (descuento or 0) * 15), 2)
+    mediano, largo = puntaje_tir(t5, meta), puntaje_tir(t10, meta)
+    total = round(0.4 * corto + 0.3 * mediano + 0.3 * largo, 2)
+    depa, _ = buscar_zona(indice, {**inm, "tipo": "departamento", "estado": "terminado"}, "venta", p["min_comparables"])
+    incidencia = round((precio / area) / depa["mediana_m2_usd"], 2) if depa and area else None
+    confianza = "alta" if len(ven) >= 5 and (nivel_v or "").startswith("distrito") else "media" if zv else "baja"
+    riesgos = ["Terreno: no da renta; la ganancia viene de comprarlo barato, de que suba de valor o de construir"]
+    if incidencia is not None:
+        riesgos.append(f"El m² del terreno cuesta {incidencia:.0%} del m² de un departamento en la zona: "
+                       + ("buen potencial para construir y vender" if incidencia <= 0.25 else "construir para vender deja poco margen" if incidencia > 0.4 else "construir puede funcionar; revisa la zonificación"))
+    if not area:
+        riesgos.append("Sin área: no se puede comparar el precio por m²")
+    if descuento is not None and descuento > 0.30:
+        riesgos.append("Precio muy por debajo de la zona: revisa papeles, zonificación, acceso, servicios y si es zona de riesgo")
+    if inm.get("estado") == "remate":
+        riesgos.append("Remate: revisar deudas, ocupantes y proceso judicial")
+    riesgos.append("Antes de comprar: partida en SUNARP, certificado de zonificación y parámetros en la municipalidad, y que tenga agua, luz y acceso")
+    frenos = [m for falla, m in (
+        (confianza != "alta", "menos de 5 terrenos parecidos en el mismo distrito"),
+        (not area, "sin área"),
+        ((descuento or 0) > 0.30, "precio demasiado bajo para ser normal"),
+        ((descuento or 0) < 0.05, "no está por debajo del precio de la zona"),
+        (pes is None or pes < p.get("tir_minima_peor_caso", 0.03), "en el peor caso no gana lo suficiente"),
+        (inm.get("estado") == "remate", "remate"),
+    ) if falla]
+    if total >= 7 and not frenos:
+        veredicto = "Comprar"
+    elif total >= 7:
+        veredicto = "Revisar a mano"
+        riesgos.append("No llega a 'Comprar' porque: " + ", ".join(frenos))
+    elif total >= 5.5 or (descuento or -1) >= 0:
+        veredicto = "Negociar"
+    else:
+        veredicto = "Descartar"
+    pmax = round(valor * 0.95, 0) if m2_zona and area else None
+    return {
+        "inmueble_id": inm.get("id"), "precio_usd": precio, "renta_mensual_usd": 0, "fuente_renta": "terreno",
+        "rentabilidad_bruta": None, "rentabilidad_neta": None, "flujo_mensual_usd": 0, "descuento_vs_zona": descuento,
+        "tir_2": None, "tir_5": t5, "tir_10": t10, "van_10": None, "payback_anios": None, "precio_max_recomendado": pmax,
+        "puntaje_corto": corto, "puntaje_mediano": mediano, "puntaje_largo": largo, "puntaje_total": total,
+        "veredicto": veredicto, "confianza": confianza, "riesgos": riesgos, "estrategia": "terreno",
+        "tir_10_temporal": None, "flujo_mensual_temporal": None, "ingreso_temporal_anual": None,
+        "detalle": {"plusvalia_usada": plusvalia, "valor_zona_usd": round(valor), "m2_zona_usd": round(m2_zona, 1) if m2_zona else None,
+                    "incidencia_vs_departamento": incidencia, "tir_10_pesimista": pes, "zona_venta": zv, "nivel_zona_venta": nivel_v,
+                    "parecidos": {"alquiler": [], "venta": _resumen(ven)}},
+        "version": VERSION,
+    }
+
+
 def analizar(inm, indice, per_distrito, p, renta_usuario=None, temporal=None, grupos=None):
+    if inm.get("tipo") == "terreno" and inm.get("operacion", "venta") == "venta":
+        return analizar_terreno(inm, indice, p, grupos)
     riesgos = []
     precio, area = float(inm["precio_usd"]), float(inm.get("area_m2") or 0)
     alq = parecidos(inm, grupos, "alquiler") if inm.get("tipo") != "terreno" else []
