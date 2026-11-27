@@ -130,6 +130,6 @@ def probar(urls, db=None):
         if db:
             from .collectors import estructurado
             est = estructurado.parsear(html, url)
-            db.registrar(f"probar:{url[:80]}", True, {"bytes": len(html), "navent": len(nav), "estructurado": len(est), "ej_est": est[:1], "crudo": estructurado.muestras(html), "ejemplo": nav[:1], "json": [m.group(0)[:150] for m in list(_re.finditer(r'(?:__NEXT_DATA__|application/ld\+json|"listings"|"results"|"totalResults"|"total_count"|"paging").{0,120}', html))[:4]]})
+            db.registrar(f"probar:{url[:80]}", True, {"bytes": len(html), "navent": len(nav), "estructurado": len(est), "ej_est": est[:1], "crudo": estructurado.muestras(html), "html": [m.group(0)[:700] for m in list(_re.finditer(r".{300}(?:/detalle/|/propiedad/|data-href|data-url).{400}", html, _re.S))[:2]], "paginas": [m.group(0) for m in list(_re.finditer(r"[^\"' ]*pagina\d+[^\"' ]*|[^\"' ]*[?&]page=\d+[^\"' ]*", html))[:4]], "total": [m.group(0)[:80] for m in list(_re.finditer(r"(?i)\d[\d.,]*\s*(?:propiedades|inmuebles|resultados|avisos)", html))[:3]], "ejemplo": nav[:1], "json": [m.group(0)[:150] for m in list(_re.finditer(r'(?:__NEXT_DATA__|application/ld\+json|"listings"|"results"|"totalResults"|"total_count"|"paging").{0,120}', html))[:4]]})
         items = nav
         print(url, "->", len(items), "avisos;", [i.get("url") for i in items[:3]])

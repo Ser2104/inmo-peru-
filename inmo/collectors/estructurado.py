@@ -32,12 +32,15 @@ def _plano(d, pref="", salida=None, nivel=0):
     return salida
 
 
+NUMERICOS = ("area", "dorm", "banos", "lat", "lng")
+
+
 def _campo(plano, nombre):
     claves = [k for k in plano if not re.search(r"image|photo|foto|logo|video|agent|broker|publisher", k)]
     for prueba in (lambda k, c: k == c, lambda k, c: k.startswith(c), lambda k, c: k.endswith(c)):
         for c in CLAVES[nombre]:
             for k in claves:
-                if prueba(k, c):
+                if prueba(k, c) and (nombre not in NUMERICOS or numero(plano[k]) is not None):
                     return plano[k]
     return None
 
