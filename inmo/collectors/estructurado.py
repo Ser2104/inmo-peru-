@@ -98,3 +98,16 @@ def parsear(html, base_url):
             if len(items) > len(mejores) and len(items) >= len(lista) * 0.5:
                 mejores = items
     return list({i["url"]: i for i in mejores}.values())
+
+
+def muestras(html, maximo=4):
+    salida = []
+    for bloque in re.findall(BLOQUES, html, re.S):
+        try:
+            datos = json.loads(bloque)
+        except ValueError:
+            continue
+        for lista in sorted(_listas(datos, []), key=len, reverse=True)[:maximo]:
+            plano = _plano(lista[0].get("item", lista[0]) if isinstance(lista[0].get("item"), dict) else lista[0])
+            salida.append({"n": len(lista), "campos": {k: str(v)[:60] for k, v in list(plano.items())[:70]}})
+    return salida[:maximo]
