@@ -90,7 +90,10 @@ def enlaces_pdf(html, base_url, limite=30):
 
 
 def extraer(html, url):
+    from . import estructurado
     items = [] if html.startswith("<pdf>") else json_ld(html, url)
+    if len(items) < 3 and not html.startswith("<pdf>"):
+        items = estructurado.parsear(html, url) or items
     if items or not llm.disponible():
         return items
     texto = _reducir(html, url, 300000)

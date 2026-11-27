@@ -128,6 +128,8 @@ def probar(urls, db=None):
             print("  muestra:", [m.group(0)[:200] for m in list(_re.finditer(patron, html))[:3]])
         nav = navent.parsear(html, url)
         if db:
-            db.registrar(f"probar:{url[:80]}", True, {"bytes": len(html), "navent": len(nav), "ejemplo": nav[:1], "json": [m.group(0)[:150] for m in list(_re.finditer(r'(?:__NEXT_DATA__|application/ld\+json|"listings"|"results"|"totalResults"|"total_count"|"paging").{0,120}', html))[:4]]})
-        items = nav or ia.extraer(html, url)
+            from .collectors import estructurado
+            est = estructurado.parsear(html, url)
+            db.registrar(f"probar:{url[:80]}", True, {"bytes": len(html), "navent": len(nav), "estructurado": len(est), "ej_est": est[:2], "ejemplo": nav[:1], "json": [m.group(0)[:150] for m in list(_re.finditer(r'(?:__NEXT_DATA__|application/ld\+json|"listings"|"results"|"totalResults"|"total_count"|"paging").{0,120}', html))[:4]]})
+        items = nav
         print(url, "->", len(items), "avisos;", [i.get("url") for i in items[:3]])
